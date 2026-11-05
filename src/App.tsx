@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { BibleReader } from './components/BibleReader';
 import { CanvasBoard } from './components/CanvasBoard';
 import { PersonalReflectionsModal } from './components/PersonalReflectionsModal';
-import { SanctuaryMode } from './components/SanctuaryMode';
+import { PresentationMode } from './components/PresentationMode';
 import { ExportModal } from './components/ExportModal';
 import { SermonListModal } from './components/SermonListModal';
 import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection } from './types';
@@ -21,10 +21,11 @@ export default function App() {
   const [sermon, setSermon] = useState<SermonNote>(getActiveSermon());
   const [activeView, setActiveView] = useState<'split' | 'canvas-only' | 'bible-only'>('split');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [currentTranslation, setCurrentTranslation] = useState('RVR1960');
 
   // Modals state
   const [isReflectionsOpen, setIsReflectionsOpen] = useState(false);
-  const [isSanctuaryOpen, setIsSanctuaryOpen] = useState(false);
+  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSermonsListOpen, setIsSermonsListOpen] = useState(false);
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
@@ -322,7 +323,7 @@ export default function App() {
         onOpenSermonsList={() => setIsSermonsListOpen(true)}
         onNewSermon={handleNewSermon}
         onOpenReflections={() => setIsReflectionsOpen(true)}
-        onOpenSanctuaryMode={() => setIsSanctuaryOpen(true)}
+        onOpenPresentationMode={() => setIsPresentationOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
         onUpdateSermonMeta={handleUpdateSermonMeta}
         activeView={activeView}
@@ -349,6 +350,8 @@ export default function App() {
               onRemoveHighlight={handleRemoveHighlight}
               onCreateLinkedCard={handleCreateLinkedCard}
               highlightedVerseId={highlightedVerseId}
+              currentTranslation={currentTranslation}
+              onSelectTranslation={setCurrentTranslation}
             />
           </div>
         )}
@@ -379,10 +382,11 @@ export default function App() {
         onConvertReflectionToCard={handleConvertReflectionToCard}
       />
 
-      <SanctuaryMode
-        isOpen={isSanctuaryOpen}
-        onClose={() => setIsSanctuaryOpen(false)}
+      <PresentationMode
+        isOpen={isPresentationOpen}
+        onClose={() => setIsPresentationOpen(false)}
         sermon={sermon}
+        currentTranslation={currentTranslation}
       />
 
       <ExportModal
