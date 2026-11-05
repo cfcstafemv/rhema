@@ -21,7 +21,7 @@ interface HeaderProps {
   onOpenSermonsList: () => void;
   onNewSermon: () => void;
   onOpenReflections: () => void;
-  onOpenSanctuaryMode: () => void;
+  onOpenPresentationMode: () => void;
   onOpenExport: () => void;
   onUpdateSermonMeta: (updates: Partial<SermonNote>) => void;
   activeView: 'split' | 'canvas-only' | 'bible-only';
@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSermonsList,
   onNewSermon,
   onOpenReflections,
-  onOpenSanctuaryMode,
+  onOpenPresentationMode,
   onOpenExport,
   onUpdateSermonMeta,
   activeView,
@@ -97,12 +97,12 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
-            onClick={onOpenSanctuaryMode}
+            onClick={onOpenPresentationMode}
             className="flex items-center gap-1.5 hover:text-amber-700 dark:hover:text-amber-400 transition-colors whitespace-nowrap cursor-pointer"
-            title="Vista sin distracciones para el culto"
+            title="Vista de pantalla completa para seguir la prédica"
           >
             <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
-            <span>Modo Santuario</span>
+            <span>Modo Presentación</span>
           </button>
         </nav>
 
