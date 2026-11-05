@@ -1,13 +1,18 @@
-import type { BibleVerse } from '../types';
-import { BIBLE_BOOKS, getBibleVerses } from '../data/bibleData';
+import type { BibleVerse, BibleBook } from '../types';
+import { BIBLE_BOOKS, BIBLE_TRANSLATIONS, getBibleVerses } from '../data/bibleData';
 
 type ApiTranslation = {
   id: string;
   name?: string;
   shortName?: string;
+  englishName?: string;
   language?: string;
+  languageName?: string;
   numberOfBooks?: number;
   totalNumberOfChapters?: number;
+  licenseNotice?: string | null;
+  licenseUrl?: string;
+  website?: string;
 };
 
 type ApiBook = {
@@ -15,6 +20,9 @@ type ApiBook = {
   name?: string;
   commonName?: string;
   shortName?: string;
+  order?: number;
+  numberOfChapters?: number;
+  isApocryphal?: boolean;
 };
 
 type ApiChapterResponse = {
@@ -25,6 +33,13 @@ type ApiChapterResponse = {
       text?: string;
     }>;
   };
+};
+
+type TranslationOption = {
+  id: string;
+  name: string;
+  shortName: string;
+  description: string;
 };
 
 const API_BASE = 'https://bible.helloao.org/api';
@@ -52,11 +67,38 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+function addSpanishTranslationsToPicker(translations: ApiTranslation[]): void {
+  const options = BIBLE_TRANSLATIONS as unknown as TranslationOption[];
+  const spanishTranslations = translations.filter(
+    (translation) => translation.language === 'spa' && (translation.numberOfBooks ?? 0) > 0
+  );
+
+  for (const translation of spanishTranslations) {
+    if (options.some((option) => option.id.toLowerCase() === translation.id.toLowerCase())) continue;
+
+    const name = translation.name || translation.englishName || translation.id;
+    const details = [translation.licenseNotice, translation.licenseUrl ? `Licencia: ${translation.licenseUrl}` : null]
+      .filter(Boolean)
+      .join(' · ');
+
+    options.push({
+      id: translation.id,
+      name,
+      shortName: translation.shortName || translation.id,
+      description: details || `Texto en español · ${translation.numberOfBooks ?? '?'} libros`,
+    });
+  }
+}
+
 function getTranslations(): Promise<ApiTranslation[]> {
   translationsPromise ??= fetchJson<{ translations?: ApiTranslation[] }>(
     `${API_BASE}/available_translations.json`
   )
-    .then((response) => response.translations ?? [])
+    .then((response) => {
+      const translations = response.translations ?? [];
+      addSpanishTranslationsToPicker(translations);
+      return translations;
+    })
     .catch((error) => {
       translationsPromise = undefined;
       throw error;
@@ -65,7 +107,6 @@ function getTranslations(): Promise<ApiTranslation[]> {
 }
 
 function findTranslationId(requested: string, available: ApiTranslation[]): string | null {
-  const normalizedRequest = requested.trim().toLowerCase();
   const aliases = TRANSLATION_ALIASES[requested.toUpperCase()] ?? [requested];
   const candidates = [...aliases, requested];
 
@@ -78,17 +119,36 @@ function findTranslationId(requested: string, available: ApiTranslation[]): stri
     if (match) return match.id;
   }
 
-  // Do not silently substitute a different translation under the requested name.
-  // If the requested version is absent, use only a complete Spanish edition, and
-  // return its actual ID to the caller's UI through verse text source attribution.
-  const spanishFullBible = available.find(
-    (translation) =>
-      translation.language === 'spa' &&
-      (translation.numberOfBooks ?? 0) >= 66 &&
-      (translation.totalNumberOfChapters ?? 0) >= 1189 &&
-      translation.id.toLowerCase() === normalizedRequest
-  );
-  return spanishFullBible?.id ?? null;
+  return null;
+}
+
+function categoryForApiBook(order = 0): BibleBook['category'] {
+  if (order <= 5) return 'Pentateuco';
+  if (order <= 17 || order === 44) return 'Históricos';
+  if (order <= 22) return 'Poéticos';
+  if (order <= 39) return 'Profetas';
+  if (order <= 43) return 'Evangelios';
+  if (order === 66) return 'Apocalipsis';
+  return 'Epístolas';
+}
+
+function addApiBooksToPicker(books: ApiBook[]): void {
+  for (const apiBook of books) {
+    if (apiBook.isApocryphal) continue;
+    const name = apiBook.commonName || apiBook.name;
+    if (!name) continue;
+    const normalizedName = normalizeText(name);
+    if (BIBLE_BOOKS.some((book) => normalizeText(book.name) === normalizedName)) continue;
+
+    BIBLE_BOOKS.push({
+      id: apiBook.id.toLowerCase(),
+      name,
+      shortName: apiBook.shortName || name,
+      testament: (apiBook.order ?? 1) <= 39 ? 'AT' : 'NT',
+      category: categoryForApiBook(apiBook.order),
+      chaptersCount: apiBook.numberOfChapters || 1,
+    });
+  }
 }
 
 async function getApiBooks(translationId: string): Promise<ApiBook[]> {
@@ -100,6 +160,7 @@ async function getApiBooks(translationId: string): Promise<ApiBook[]> {
   );
   const books = response.books ?? [];
   booksCache.set(translationId, books);
+  addApiBooksToPicker(books);
   return books;
 }
 
@@ -113,7 +174,7 @@ async function findApiBookId(translationId: string, localBookId: string): Promis
     const bookNames = [book.name, book.commonName, book.shortName]
       .filter((name): name is string => Boolean(name))
       .map(normalizeText);
-    return bookNames.includes(localName);
+    return bookNames.includes(localName) || book.id.toLowerCase() === localBookId.toLowerCase();
   });
 
   return match?.id ?? null;
