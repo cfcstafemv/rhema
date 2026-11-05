@@ -1,0 +1,6 @@
+{
+  "name": "Rhema — Notas de Prédica y Lienzo Bíblico",
+  "description": "Toma de notas creativas de prédicas con visor bíblico interactivo, tarjetas flotantes conectadas por hilos visuales, resaltado cromático de versículos y espacio de reflexión personal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
