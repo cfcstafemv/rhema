@@ -54,7 +54,7 @@ export const HIGHLIGHT_CATEGORIES = [
   {
     id: 'central',
     name: 'Mensaje Central',
-    color: '#F59E0B', // Amber
+    color: '#F59E0B',
     bgLight: 'bg-amber-100/90 text-amber-950 border-amber-300',
     border: 'border-amber-400',
     ring: 'ring-amber-400',
@@ -63,7 +63,7 @@ export const HIGHLIGHT_CATEGORIES = [
   {
     id: 'promise',
     name: 'Promesa Divina',
-    color: '#3B82F6', // Blue
+    color: '#3B82F6',
     bgLight: 'bg-blue-100/90 text-blue-950 border-blue-300',
     border: 'border-blue-400',
     ring: 'ring-blue-400',
@@ -72,7 +72,7 @@ export const HIGHLIGHT_CATEGORIES = [
   {
     id: 'command',
     name: 'Mandato / Acción',
-    color: '#10B981', // Emerald
+    color: '#10B981',
     bgLight: 'bg-emerald-100/90 text-emerald-950 border-emerald-300',
     border: 'border-emerald-400',
     ring: 'ring-emerald-400',
@@ -81,7 +81,7 @@ export const HIGHLIGHT_CATEGORIES = [
   {
     id: 'revelation',
     name: 'Palabra Clave / Revelación',
-    color: '#8B5CF6', // Purple
+    color: '#8B5CF6',
     bgLight: 'bg-purple-100/90 text-purple-950 border-purple-300',
     border: 'border-purple-400',
     ring: 'ring-purple-400',
@@ -90,7 +90,7 @@ export const HIGHLIGHT_CATEGORIES = [
   {
     id: 'reflection',
     name: 'Reflexión Personal',
-    color: '#EC4899', // Pink
+    color: '#EC4899',
     bgLight: 'bg-pink-100/90 text-pink-950 border-pink-300',
     border: 'border-pink-400',
     ring: 'ring-pink-400',
@@ -106,7 +106,61 @@ export const CARD_TYPES = [
   { id: 'cross', label: 'Cita Cruzada', color: '#3B82F6', icon: 'Compass' },
 ] as const;
 
-// Curated Bible passages (Reina-Valera 1960)
+export const BIBLE_TRANSLATIONS = [
+  {
+    id: 'RVR1960',
+    name: 'Reina Valera 1960',
+    shortName: 'RVR1960',
+    description: 'Traducción clásica y pastoralia con texto tradicional',
+  },
+  {
+    id: 'NTV',
+    name: 'Nueva Traducción Viviente',
+    shortName: 'NTV',
+    description: 'Versión moderna y muy legible para estudio y predicación',
+  },
+  {
+    id: 'NBLA',
+    name: 'Nueva Biblia de las Américas',
+    shortName: 'NBLA',
+    description: 'Traducción contemporánea con claridad literal y pastoral',
+  },
+] as const;
+
+const CUSTOM_VERSES_KEY = 'rhema_custom_verses_v1';
+
+export function saveCustomVerses(
+  bookId: string,
+  chapter: number,
+  verses: Array<{ verse: number; text: string }>
+): void {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_VERSES_KEY);
+    const current = raw ? (JSON.parse(raw) as Record<string, Record<number, Array<{ verse: number; text: string }>>>) : {};
+    current[bookId] = current[bookId] || {};
+    current[bookId][chapter] = verses;
+    window.localStorage.setItem(CUSTOM_VERSES_KEY, JSON.stringify(current));
+  } catch (error) {
+    console.warn('No se pudieron guardar los versículos personalizados:', error);
+  }
+}
+
+const getCustomVerses = (bookId: string, chapter: number): Array<{ verse: number; text: string }> | null => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_VERSES_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Record<string, Record<number, Array<{ verse: number; text: string }>>>;
+    return parsed?.[bookId]?.[chapter] ?? null;
+  } catch {
+    return null;
+  }
+};
+
+// Curated Bible passages (Reina-Valera 1960 / fallback content for all selected versions)
 const SCRIPTURE_DATABASE: Record<string, Record<number, { verse: number; text: string }[]>> = {
   rom: {
     8: [
@@ -173,7 +227,7 @@ const SCRIPTURE_DATABASE: Record<string, Record<number, { verse: number; text: s
       { verse: 4, text: "Regocijaos en el Señor siempre. Otra vez digo: ¡Regocijaos!" },
       { verse: 6, text: "Por nada estéis afanosos, sino sean conocidas vuestras peticiones delante de Dios en toda oración y ruego, con acción de gracias." },
       { verse: 7, text: "Y la paz de Dios, que sobrepasa todo entendimiento, guardará vuestros corazones y vuestros pensamientos en Cristo Jesús." },
-      { verse: 8, text: "Por lo demás, hermanos, todo lo que es verdadero, todo lo honesto, todo lo justo, todo lo puro, todo lo amable, todo lo que es de buen nombre; si hay virtud alguna, si algo digno de alabanza, en esto pensad." },
+      { verse: 8, text: "Por lo demás, hermanos, todo lo que es verdadero, todo lo honesto, todo lo justo, todo lo puro, todo lo amable, todo lo que es de buen nombre; si hay virtud alguna, si alguna alabanza, pensad en estas cosas." },
       { verse: 13, text: "Todo lo puedo en Cristo que me fortalece." }
     ]
   },
@@ -232,7 +286,7 @@ const SCRIPTURE_DATABASE: Record<string, Record<number, { verse: number; text: s
   },
   isa: {
     40: [
-      { verse: 28, text: "¿No has sabido, no has oído que el Dios eterno es Jehová, el cual creó los confines de la tierra? No desfallece, ni se fatiga con cansancio, y su entendimiento no hay quien lo alcance." },
+      { verse: 28, text: "¿No has sabido, no has oído que el Dios eterno es Jehová, el cual creó los confines de la tierra? No desfallece, ni se fatiga con cansancio, y su entendimiento no ha sido limitado." },
       { verse: 29, text: "Él da esfuerzo al cansado, y multiplica las fuerzas al que no tiene ningunas." },
       { verse: 30, text: "Los muchachos se fatigan y se cansan, los jóvenes flaquean y caen;" },
       { verse: 31, text: "pero los que esperan a Jehová tendrán nuevas fuerzas; levantarán alas como las águilas; correrán, y no se cansarán; caminarán, y no se fatigarán." }
@@ -258,10 +312,20 @@ const SCRIPTURE_DATABASE: Record<string, Record<number, { verse: number; text: s
  * Retrieves Bible verses for a specific book and chapter.
  * Fallbacks cleanly to structured template verses if the exact chapter is not in the curated memory.
  */
-export function getBibleVerses(bookId: string, chapter: number): BibleVerse[] {
+export function getBibleVerses(bookId: string, chapter: number, translation = 'RVR1960'): BibleVerse[] {
   const book = BIBLE_BOOKS.find((b) => b.id === bookId) || BIBLE_BOOKS[0];
-  const dbBook = SCRIPTURE_DATABASE[bookId];
+  const customVerses = getCustomVerses(bookId, chapter);
+  if (customVerses && customVerses.length > 0) {
+    return customVerses.map((v) => ({
+      bookId,
+      bookName: book.name,
+      chapter,
+      verse: v.verse,
+      text: v.text,
+    }));
+  }
 
+  const dbBook = SCRIPTURE_DATABASE[bookId];
   if (dbBook && dbBook[chapter]) {
     return dbBook[chapter].map((v) => ({
       bookId,
@@ -272,44 +336,14 @@ export function getBibleVerses(bookId: string, chapter: number): BibleVerse[] {
     }));
   }
 
-  // Graceful fallback for any chapter: generates editable scripture placeholder
-  // where the congregation can also edit/add verses on the fly
+  const fallbackText = `Versión ${translation} · ${book.name} capítulo ${chapter}. La Palabra de Dios es viva y eficaz, y nos enseña a vivir con fe, esperanza y obediencia.`;
+
   return [
-    {
-      bookId,
-      bookName: book.name,
-      chapter,
-      verse: 1,
-      text: `Palabra del Señor en ${book.name} capítulo ${chapter}. Porque la Palabra de Dios es viva y eficaz, más cortante que toda espada de dos filos.`,
-    },
-    {
-      bookId,
-      bookName: book.name,
-      chapter,
-      verse: 2,
-      text: `En Jehová confía mi corazón y fui ayudado; por lo que se gozó mi corazón, y con mi cántico le alabaré.`,
-    },
-    {
-      bookId,
-      bookName: book.name,
-      chapter,
-      verse: 3,
-      text: `Lámpara es a mis pies tu palabra, y lumbrera a mi camino para guardar tus mandamientos en rectitud.`,
-    },
-    {
-      bookId,
-      bookName: book.name,
-      chapter,
-      verse: 4,
-      text: `Bendito el varón que confía en Jehová, y cuya confianza es Jehová. Será como el árbol plantado junto a las aguas.`,
-    },
-    {
-      bookId,
-      bookName: book.name,
-      chapter,
-      verse: 5,
-      text: `Clama a mí, y yo te responderé, y te enseñaré cosas grandes y ocultas que tú no conoces.`,
-    },
+    { bookId, bookName: book.name, chapter, verse: 1, text: fallbackText },
+    { bookId, bookName: book.name, chapter, verse: 2, text: `En Jehová confía mi corazón y fui ayudado; por lo que se gozó mi corazón, y con mi cántico le alabaré.` },
+    { bookId, bookName: book.name, chapter, verse: 3, text: `Lámpara es a mis pies tu palabra, y lumbrera a mi camino para guardar tus mandamientos en rectitud.` },
+    { bookId, bookName: book.name, chapter, verse: 4, text: `Bendito el varón que confía en Jehová, y cuya confianza es Jehová. Será como el árbol plantado junto a las aguas.` },
+    { bookId, bookName: book.name, chapter, verse: 5, text: `Clama a mí, y yo te responderé, y te enseñaré cosas grandes y ocultas que tú no conoces.` },
   ];
 }
 
@@ -492,3 +526,4 @@ export const INITIAL_SAMPLE_SERMON: SermonNote = {
   },
   updatedAt: Date.now(),
 };
+
