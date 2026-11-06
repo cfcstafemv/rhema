@@ -143,9 +143,21 @@ export const CARD_TYPES = [
 export const BIBLE_TRANSLATIONS = [
   {
     id: 'RVR1960',
-    name: 'Reina-Valera (RVR1960)',
+    name: 'Reina-Valera 1960',
     shortName: 'RVR1960',
     description: 'Traducción clásica y predilecta para predicación y estudio bíblico',
+  },
+  {
+    id: 'NTV',
+    name: 'Nueva Traducción Viviente',
+    shortName: 'NTV',
+    description: 'Lenguaje moderno, dinámico y claro para lectura devocional y contemporánea',
+  },
+  {
+    id: 'NBLA',
+    name: 'Nueva Biblia de las Américas',
+    shortName: 'NBLA',
+    description: 'Fidelidad literal con precisión castellana contemporánea',
   },
 ] as const;
 
