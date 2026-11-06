@@ -15,6 +15,13 @@ type ApiTranslation = {
   website?: string;
 };
 
+export type BibleTranslationOption = {
+  id: string;
+  name: string;
+  shortName: string;
+  description: string;
+};
+
 type ApiBook = {
   id: string;
   name?: string;
@@ -33,13 +40,6 @@ type ApiChapterResponse = {
       text?: string;
     }>;
   };
-};
-
-type TranslationOption = {
-  id: string;
-  name: string;
-  shortName: string;
-  description: string;
 };
 
 const API_BASE = 'https://bible.helloao.org/api';
@@ -67,43 +67,31 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-function addSpanishTranslationsToPicker(translations: ApiTranslation[]): void {
-  const options = BIBLE_TRANSLATIONS as unknown as TranslationOption[];
-  const spanishTranslations = translations.filter(
-    (translation) => translation.language === 'spa' && (translation.numberOfBooks ?? 0) > 0
-  );
-
-  for (const translation of spanishTranslations) {
-    if (options.some((option) => option.id.toLowerCase() === translation.id.toLowerCase())) continue;
-
-    const name = translation.name || translation.englishName || translation.id;
-    const details = [translation.licenseNotice, translation.licenseUrl ? `Licencia: ${translation.licenseUrl}` : null]
-      .filter(Boolean)
-      .join(' · ');
-
-    options.push({
-      id: translation.id,
-      name,
-      shortName: translation.shortName || translation.id,
-      description: details || `Texto en español · ${translation.numberOfBooks ?? '?'} libros`,
-    });
-  }
-}
-
 function getTranslations(): Promise<ApiTranslation[]> {
   translationsPromise ??= fetchJson<{ translations?: ApiTranslation[] }>(
     `${API_BASE}/available_translations.json`
   )
-    .then((response) => {
-      const translations = response.translations ?? [];
-      addSpanishTranslationsToPicker(translations);
-      return translations;
-    })
+    .then((response) => response.translations ?? [])
     .catch((error) => {
       translationsPromise = undefined;
       throw error;
     });
   return translationsPromise;
+}
+
+/** Loads the current Spanish catalogue and returns only real API translation IDs. */
+export async function getAvailableBibleTranslations(): Promise<BibleTranslationOption[]> {
+  const translations = await getTranslations();
+  const spanish = translations.filter(
+    (translation) => translation.language === 'spa' && (translation.numberOfBooks ?? 0) > 0
+  );
+
+  return spanish.map((translation) => ({
+    id: translation.id,
+    name: translation.name || translation.englishName || translation.id,
+    shortName: translation.shortName || translation.id,
+    description: translation.licenseNotice || `Disponible en HelloAO · ${translation.numberOfBooks} libros`,
+  }));
 }
 
 function findTranslationId(requested: string, available: ApiTranslation[]): string | null {
