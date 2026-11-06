@@ -15,7 +15,7 @@ import {
   deleteSermon
 } from './services/storage';
 import { BIBLE_BOOKS, CARD_TYPES, BIBLE_TRANSLATIONS } from './data/bibleData';
-import { getAvailableBibleTranslations } from './services/bibleService';
+import { getAvailableBibleTranslations, BibleTranslationOption } from './services/bibleService';
 
 export default function App() {
   const [sermons, setSermons] = useState<SermonNote[]>([]);
@@ -23,7 +23,7 @@ export default function App() {
   const [activeView, setActiveView] = useState<'split' | 'canvas-only' | 'bible-only'>('split');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentTranslation, setCurrentTranslation] = useState('RVR1960');
-  const [availableTranslations, setAvailableTranslations] = useState(BIBLE_TRANSLATIONS);
+  const [availableTranslations, setAvailableTranslations] = useState<BibleTranslationOption[]>(BIBLE_TRANSLATIONS as any);
   const [isReflectionsOpen, setIsReflectionsOpen] = useState(false);
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
@@ -62,7 +62,7 @@ export default function App() {
       })
       .catch(() => {
         if (isMounted) {
-          setAvailableTranslations(BIBLE_TRANSLATIONS);
+          setAvailableTranslations(BIBLE_TRANSLATIONS as any);
         }
       });
 

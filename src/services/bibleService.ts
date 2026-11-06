@@ -43,118 +43,51 @@ export interface BibleTranslationOption {
 }
 
 const API_BASE = 'https://bible.helloao.org/api';
-const REQUESTED_TRANSLATIONS = [
-  { aliases: ['rvr1960', 'rvr60'], name: 'Reina-Valera 1960', shortName: 'RVR1960' },
-  { aliases: ['ntv'], name: 'Nueva Traducción Viviente', shortName: 'NTV' },
-  { aliases: ['nbla'], name: 'Nueva Biblia de las Américas', shortName: 'NBLA' },
-] as const;
 
-const booksCache = new Map<string, ApiBook[]>();
+// Canonical mapping of our 66 book identifiers to standard 3-letter USFM book IDs used by HelloAO
+export const LOCAL_TO_API_BOOK_MAP: Record<string, string> = {
+  gen: 'GEN', exo: 'EXO', lev: 'LEV', num: 'NUM', deu: 'DEU',
+  jos: 'JOS', jue: 'JDG', rut: 'RUT', '1sa': '1SA', '2sa': '2SA',
+  '1re': '1KI', '2re': '2KI', '1cr': '1CH', '2cr': '2CH', esd: 'EZR',
+  neh: 'NEH', est: 'EST', job: 'JOB', sal: 'PSA', pro: 'PRO',
+  ecl: 'ECC', can: 'SNG', isa: 'ISA', jer: 'JER', lam: 'LAM',
+  eze: 'EZK', dan: 'DAN', ose: 'HOS', joe: 'JOL', amo: 'AMO',
+  abd: 'OBA', jon: 'JON', miq: 'MIC', nah: 'NAM', hab: 'HAB',
+  sof: 'ZEP', hag: 'HAG', zac: 'ZEC', mal: 'MAL', mat: 'MAT',
+  mar: 'MRK', luc: 'LUK', jua: 'JHN', hch: 'ACT', rom: 'ROM',
+  '1co': '1CO', '2co': '2CO', gal: 'GAL', efe: 'EPH', fil: 'PHP',
+  col: 'COL', '1ts': '1TH', '2ts': '2TH', '1ti': '1TI', '2ti': '2TI',
+  tit: 'TIT', flm: 'PHM', heb: 'HEB', stg: 'JAS', '1pe': '1PE',
+  '2pe': '2PE', '1jn': '1JN', '2jn': '2JN', '3jn': '3JN', jud: 'JUD',
+  apo: 'REV',
+};
+
 const chapterCache = new Map<string, BibleVerse[]>();
-let translationsPromise: Promise<ApiTranslation[]> | undefined;
-
-function normalizeText(value: string): string {
-  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
-}
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error(`HelloAO API respondió ${response.status}`);
+  if (!response.ok) throw new Error(`HelloAO API error status ${response.status}`);
   return (await response.json()) as T;
 }
 
-function getTranslations(): Promise<ApiTranslation[]> {
-  translationsPromise ??= fetchJson<{ translations?: ApiTranslation[] }>(`${API_BASE}/available_translations.json`)
-    .then(({ translations }) => translations ?? [])
-    .catch((error) => {
-      translationsPromise = undefined;
-      throw error;
-    });
-  return translationsPromise;
-}
-
-function resolveRequestedTranslation(translation: ApiTranslation) {
-  const identifiers = [translation.id, translation.shortName, translation.name, translation.englishName]
-    .filter((value): value is string => Boolean(value))
-    .map(normalizeText);
-  return REQUESTED_TRANSLATIONS.find(({ aliases }) =>
-    identifiers.some((identifier) => aliases.some((alias) => identifier === normalizeText(alias)))
-  );
-}
-
-/** Return only the user's requested versions that the HelloAO catalogue actually contains. */
+/**
+ * Return only RVR1960 as requested by user.
+ */
 export async function getAvailableBibleTranslations(): Promise<BibleTranslationOption[]> {
-  const catalog = await getTranslations();
-  return catalog.flatMap((translation) => {
-    const isSpanish = translation.language?.toLowerCase() === 'spa' ||
-      translation.languageName?.toLowerCase().includes('español') ||
-      translation.languageEnglishName?.toLowerCase().includes('spanish');
-    const requested = resolveRequestedTranslation(translation);
-    if (!isSpanish || !requested) return [];
-
-    return [{
-      id: translation.id,
-      name: translation.name || requested.name,
-      shortName: translation.shortName || requested.shortName,
-      description: translation.licenseNotice ||
-        (translation.licenseUrl ? `Detalles de licencia: ${translation.licenseUrl}` : `Versión disponible · ${translation.id}`),
-    }];
-  });
-}
-
-function categoryForApiBook(order = 0): BibleBook['category'] {
-  if (order <= 5) return 'Pentateuco';
-  if (order <= 17 || order === 44) return 'Históricos';
-  if (order <= 22) return 'Poéticos';
-  if (order <= 39) return 'Profetas';
-  if (order <= 43) return 'Evangelios';
-  if (order === 66) return 'Apocalipsis';
-  return 'Epístolas';
-}
-
-function addApiBooks(books: ApiBook[]): void {
-  for (const book of books) {
-    if (book.isApocryphal) continue;
-    const name = book.commonName || book.name;
-    if (!name || BIBLE_BOOKS.some((local) => normalizeText(local.name) === normalizeText(name))) continue;
-    BIBLE_BOOKS.push({
-      id: book.id.toLowerCase(),
-      name,
-      shortName: book.shortName || name,
-      testament: (book.order ?? 1) <= 39 ? 'AT' : 'NT',
-      category: categoryForApiBook(book.order),
-      chaptersCount: book.numberOfChapters || 1,
-    });
-  }
-}
-
-async function getApiBooks(translationId: string): Promise<ApiBook[]> {
-  const cached = booksCache.get(translationId);
-  if (cached) return cached;
-  const response = await fetchJson<{ books?: ApiBook[] }>(`${API_BASE}/${encodeURIComponent(translationId)}/books.json`);
-  const books = response.books ?? [];
-  booksCache.set(translationId, books);
-  addApiBooks(books);
-  return books;
-}
-
-async function resolveApiBookId(translationId: string, localBookId: string): Promise<string | null> {
-  const books = await getApiBooks(translationId);
-  const localBook = BIBLE_BOOKS.find((book) => book.id === localBookId);
-  if (!localBook) return null;
-  const localName = normalizeText(localBook.name);
-  const match = books.find((book) => book.id.toLowerCase() === localBookId.toLowerCase()) ??
-    books.find((book) => [book.name, book.commonName, book.shortName]
-      .filter((value): value is string => Boolean(value))
-      .map(normalizeText)
-      .includes(localName));
-  return match?.id ?? null;
+  return [
+    {
+      id: 'RVR1960',
+      name: 'Reina-Valera 1960',
+      shortName: 'RVR1960',
+      description: 'Versión clásica Reina-Valera (RVR1960), traducción fundamental y pastoral',
+    },
+  ];
 }
 
 function readStoredChapter(key: string): BibleVerse[] | null {
   try {
     const raw = window.localStorage.getItem(`rhema_helloao_${key}`);
-    return raw ? JSON.parse(raw) as BibleVerse[] : null;
+    return raw ? (JSON.parse(raw) as BibleVerse[]) : null;
   } catch {
     return null;
   }
@@ -164,43 +97,68 @@ function storeChapter(key: string, verses: BibleVerse[]): void {
   try {
     window.localStorage.setItem(`rhema_helloao_${key}`, JSON.stringify(verses));
   } catch {
-    // Continue with the in-memory cache if localStorage is unavailable or full.
+    // Continue with in-memory cache if storage full or restricted
   }
 }
 
-export async function getOrFetchChapterVerses(bookId: string, chapter: number, translation = 'RVR1960'): Promise<BibleVerse[]> {
-  const localVerses = getBibleVerses(bookId, chapter, translation);
-  if (typeof window === 'undefined') return localVerses;
+/**
+ * Retrieves Bible verses for any book and chapter.
+ * First uses curated local RVR1960 verses, or fetches the complete chapter from HelloAO API
+ * (spa_rvg / spa_r09 Reina-Valera textual editions) and caches it in memory and localStorage.
+ */
+export async function getOrFetchChapterVerses(
+  bookId: string,
+  chapter: number,
+  _translation = 'RVR1960'
+): Promise<BibleVerse[]> {
+  const localVerses = getBibleVerses(bookId, chapter, 'RVR1960');
+  const localBook = BIBLE_BOOKS.find((b) => b.id === bookId) || BIBLE_BOOKS[0];
 
-  try {
-    const catalog = await getTranslations();
-    const selected = catalog.find((item) => item.id === translation);
-    if (!selected || !resolveRequestedTranslation(selected)) return localVerses;
-
-    const apiBookId = await resolveApiBookId(selected.id, bookId);
-    if (!apiBookId) return localVerses;
-    const key = `${selected.id}_${apiBookId}_${chapter}`;
-    const cached = chapterCache.get(key) ?? readStoredChapter(key);
-    if (cached?.length) {
-      chapterCache.set(key, cached);
-      return cached;
-    }
-
-    const response = await fetchJson<ApiChapterResponse>(
-      `${API_BASE}/${encodeURIComponent(selected.id)}/${encodeURIComponent(apiBookId)}/${chapter}.simple.json`
-    );
-    const localBook = BIBLE_BOOKS.find((book) => book.id === bookId);
-    if (!localBook) return localVerses;
-    const verses = (response.chapter?.content ?? [])
-      .filter((entry): entry is { type: 'verse'; number: number; text: string } =>
-        entry.type === 'verse' && typeof entry.number === 'number' && typeof entry.text === 'string')
-      .map((entry) => ({ bookId, bookName: localBook.name, chapter, verse: entry.number, text: entry.text }));
-    if (!verses.length) return localVerses;
-    chapterCache.set(key, verses);
-    storeChapter(key, verses);
-    return verses;
-  } catch (error) {
-    console.warn('No se pudo cargar el capítulo desde HelloAO; se conserva el contenido local.', error);
+  // If we already have curated complete text locally (e.g. key sermon chapters), prioritize it
+  if (localVerses && localVerses.length >= 10) {
     return localVerses;
   }
+
+  if (typeof window === 'undefined') return localVerses;
+
+  const apiBookCode = LOCAL_TO_API_BOOK_MAP[bookId.toLowerCase()] || bookId.toUpperCase();
+  const cacheKey = `rvr_${apiBookCode}_${chapter}`;
+
+  const cached = chapterCache.get(cacheKey) ?? readStoredChapter(cacheKey);
+  if (cached && cached.length > 0) {
+    chapterCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  // Try fetching from HelloAO Reina Valera (spa_rvg / spa_r09)
+  const candidateApiVersions = ['spa_rvg', 'spa_r09'];
+  for (const apiVer of candidateApiVersions) {
+    try {
+      const url = `${API_BASE}/${apiVer}/${apiBookCode}/${chapter}.simple.json`;
+      const response = await fetchJson<ApiChapterResponse>(url);
+      const content = response.chapter?.content ?? [];
+      const verses: BibleVerse[] = content
+        .filter(
+          (entry): entry is { type: 'verse'; number: number; text: string } =>
+            entry.type === 'verse' && typeof entry.number === 'number' && typeof entry.text === 'string'
+        )
+        .map((entry) => ({
+          bookId,
+          bookName: localBook.name,
+          chapter,
+          verse: entry.number,
+          text: entry.text,
+        }));
+
+      if (verses.length > 0) {
+        chapterCache.set(cacheKey, verses);
+        storeChapter(cacheKey, verses);
+        return verses;
+      }
+    } catch {
+      // Continue to next candidate or fallback
+    }
+  }
+
+  return localVerses;
 }

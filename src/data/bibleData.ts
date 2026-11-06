@@ -1,12 +1,14 @@
 import { BibleBook, BibleVerse, SermonNote } from '../types';
 
 export const BIBLE_BOOKS: BibleBook[] = [
-  // Antiguo Testamento
+  // Antiguo Testamento - Pentateuco
   { id: 'gen', name: 'Génesis', shortName: 'Gn', testament: 'AT', category: 'Pentateuco', chaptersCount: 50 },
   { id: 'exo', name: 'Éxodo', shortName: 'Éx', testament: 'AT', category: 'Pentateuco', chaptersCount: 40 },
   { id: 'lev', name: 'Levítico', shortName: 'Lv', testament: 'AT', category: 'Pentateuco', chaptersCount: 27 },
   { id: 'num', name: 'Números', shortName: 'Nm', testament: 'AT', category: 'Pentateuco', chaptersCount: 36 },
   { id: 'deu', name: 'Deuteronomio', shortName: 'Dt', testament: 'AT', category: 'Pentateuco', chaptersCount: 34 },
+
+  // Antiguo Testamento - Históricos
   { id: 'jos', name: 'Josué', shortName: 'Jos', testament: 'AT', category: 'Históricos', chaptersCount: 24 },
   { id: 'jue', name: 'Jueces', shortName: 'Jue', testament: 'AT', category: 'Históricos', chaptersCount: 21 },
   { id: 'rut', name: 'Rut', shortName: 'Rut', testament: 'AT', category: 'Históricos', chaptersCount: 4 },
@@ -14,22 +16,48 @@ export const BIBLE_BOOKS: BibleBook[] = [
   { id: '2sa', name: '2 Samuel', shortName: '2 S', testament: 'AT', category: 'Históricos', chaptersCount: 24 },
   { id: '1re', name: '1 Reyes', shortName: '1 R', testament: 'AT', category: 'Históricos', chaptersCount: 22 },
   { id: '2re', name: '2 Reyes', shortName: '2 R', testament: 'AT', category: 'Históricos', chaptersCount: 25 },
+  { id: '1cr', name: '1 Crónicas', shortName: '1 Cr', testament: 'AT', category: 'Históricos', chaptersCount: 29 },
+  { id: '2cr', name: '2 Crónicas', shortName: '2 Cr', testament: 'AT', category: 'Históricos', chaptersCount: 36 },
+  { id: 'esd', name: 'Esdras', shortName: 'Esd', testament: 'AT', category: 'Históricos', chaptersCount: 10 },
+  { id: 'neh', name: 'Nehemías', shortName: 'Neh', testament: 'AT', category: 'Históricos', chaptersCount: 13 },
+  { id: 'est', name: 'Ester', shortName: 'Est', testament: 'AT', category: 'Históricos', chaptersCount: 10 },
+
+  // Antiguo Testamento - Poéticos y Sapienciales
+  { id: 'job', name: 'Job', shortName: 'Job', testament: 'AT', category: 'Poéticos', chaptersCount: 42 },
   { id: 'sal', name: 'Salmos', shortName: 'Sal', testament: 'AT', category: 'Poéticos', chaptersCount: 150 },
   { id: 'pro', name: 'Proverbios', shortName: 'Pr', testament: 'AT', category: 'Poéticos', chaptersCount: 31 },
   { id: 'ecl', name: 'Eclesiastés', shortName: 'Ec', testament: 'AT', category: 'Poéticos', chaptersCount: 12 },
   { id: 'can', name: 'Cantares', shortName: 'Cnt', testament: 'AT', category: 'Poéticos', chaptersCount: 8 },
+
+  // Antiguo Testamento - Profetas Mayores
   { id: 'isa', name: 'Isaías', shortName: 'Is', testament: 'AT', category: 'Profetas', chaptersCount: 66 },
   { id: 'jer', name: 'Jeremías', shortName: 'Jer', testament: 'AT', category: 'Profetas', chaptersCount: 52 },
   { id: 'lam', name: 'Lamentaciones', shortName: 'Lm', testament: 'AT', category: 'Profetas', chaptersCount: 5 },
   { id: 'eze', name: 'Ezequiel', shortName: 'Ez', testament: 'AT', category: 'Profetas', chaptersCount: 48 },
   { id: 'dan', name: 'Daniel', shortName: 'Dn', testament: 'AT', category: 'Profetas', chaptersCount: 12 },
 
-  // Nuevo Testamento
+  // Antiguo Testamento - Profetas Menores
+  { id: 'ose', name: 'Oseas', shortName: 'Os', testament: 'AT', category: 'Profetas', chaptersCount: 14 },
+  { id: 'joe', name: 'Joel', shortName: 'Jl', testament: 'AT', category: 'Profetas', chaptersCount: 3 },
+  { id: 'amo', name: 'Amós', shortName: 'Am', testament: 'AT', category: 'Profetas', chaptersCount: 9 },
+  { id: 'abd', name: 'Abdías', shortName: 'Abd', testament: 'AT', category: 'Profetas', chaptersCount: 1 },
+  { id: 'jon', name: 'Jonás', shortName: 'Jon', testament: 'AT', category: 'Profetas', chaptersCount: 4 },
+  { id: 'miq', name: 'Miqueas', shortName: 'Miq', testament: 'AT', category: 'Profetas', chaptersCount: 7 },
+  { id: 'nah', name: 'Nahum', shortName: 'Nah', testament: 'AT', category: 'Profetas', chaptersCount: 3 },
+  { id: 'hab', name: 'Habacuc', shortName: 'Hab', testament: 'AT', category: 'Profetas', chaptersCount: 3 },
+  { id: 'sof', name: 'Sofonías', shortName: 'Sof', testament: 'AT', category: 'Profetas', chaptersCount: 3 },
+  { id: 'hag', name: 'Hageo', shortName: 'Hag', testament: 'AT', category: 'Profetas', chaptersCount: 2 },
+  { id: 'zac', name: 'Zacarías', shortName: 'Zac', testament: 'AT', category: 'Profetas', chaptersCount: 14 },
+  { id: 'mal', name: 'Malaquías', shortName: 'Mal', testament: 'AT', category: 'Profetas', chaptersCount: 4 },
+
+  // Nuevo Testamento - Evangelios y Hechos
   { id: 'mat', name: 'Mateo', shortName: 'Mt', testament: 'NT', category: 'Evangelios', chaptersCount: 28 },
   { id: 'mar', name: 'Marcos', shortName: 'Mr', testament: 'NT', category: 'Evangelios', chaptersCount: 16 },
   { id: 'luc', name: 'Lucas', shortName: 'Lc', testament: 'NT', category: 'Evangelios', chaptersCount: 24 },
   { id: 'jua', name: 'Juan', shortName: 'Jn', testament: 'NT', category: 'Evangelios', chaptersCount: 21 },
   { id: 'hch', name: 'Hechos', shortName: 'Hch', testament: 'NT', category: 'Históricos', chaptersCount: 28 },
+
+  // Nuevo Testamento - Epístolas Paulinas y Generales
   { id: 'rom', name: 'Romanos', shortName: 'Ro', testament: 'NT', category: 'Epístolas', chaptersCount: 16 },
   { id: '1co', name: '1 Corintios', shortName: '1 Co', testament: 'NT', category: 'Epístolas', chaptersCount: 16 },
   { id: '2co', name: '2 Corintios', shortName: '2 Co', testament: 'NT', category: 'Epístolas', chaptersCount: 13 },
@@ -42,11 +70,17 @@ export const BIBLE_BOOKS: BibleBook[] = [
   { id: '1ti', name: '1 Timoteo', shortName: '1 Ti', testament: 'NT', category: 'Epístolas', chaptersCount: 6 },
   { id: '2ti', name: '2 Timoteo', shortName: '2 Ti', testament: 'NT', category: 'Epístolas', chaptersCount: 4 },
   { id: 'tit', name: 'Tito', shortName: 'Tit', testament: 'NT', category: 'Epístolas', chaptersCount: 3 },
+  { id: 'flm', name: 'Filemón', shortName: 'Flm', testament: 'NT', category: 'Epístolas', chaptersCount: 1 },
   { id: 'heb', name: 'Hebreos', shortName: 'He', testament: 'NT', category: 'Epístolas', chaptersCount: 13 },
   { id: 'stg', name: 'Santiago', shortName: 'Stg', testament: 'NT', category: 'Epístolas', chaptersCount: 5 },
   { id: '1pe', name: '1 Pedro', shortName: '1 P', testament: 'NT', category: 'Epístolas', chaptersCount: 5 },
   { id: '2pe', name: '2 Pedro', shortName: '2 P', testament: 'NT', category: 'Epístolas', chaptersCount: 3 },
   { id: '1jn', name: '1 Juan', shortName: '1 Jn', testament: 'NT', category: 'Epístolas', chaptersCount: 5 },
+  { id: '2jn', name: '2 Juan', shortName: '2 Jn', testament: 'NT', category: 'Epístolas', chaptersCount: 1 },
+  { id: '3jn', name: '3 Juan', shortName: '3 Jn', testament: 'NT', category: 'Epístolas', chaptersCount: 1 },
+  { id: 'jud', name: 'Judas', shortName: 'Jud', testament: 'NT', category: 'Epístolas', chaptersCount: 1 },
+
+  // Nuevo Testamento - Revelación
   { id: 'apo', name: 'Apocalipsis', shortName: 'Ap', testament: 'NT', category: 'Apocalipsis', chaptersCount: 22 },
 ];
 
@@ -109,51 +143,9 @@ export const CARD_TYPES = [
 export const BIBLE_TRANSLATIONS = [
   {
     id: 'RVR1960',
-    name: 'Reina Valera 1960',
+    name: 'Reina-Valera (RVR1960)',
     shortName: 'RVR1960',
-    description: 'Traducción clásica y pastoral con tradición reformada',
-  },
-  {
-    id: 'RVR60',
-    name: 'Reina-Valera 1960',
-    shortName: 'RVR60',
-    description: 'Versión clásica disponible en el catálogo oficial de la API',
-  },
-  {
-    id: 'NTV',
-    name: 'Nueva Traducción Viviente',
-    shortName: 'NTV',
-    description: 'Versión moderna y muy legible para estudio y predicación',
-  },
-  {
-    id: 'NBLA',
-    name: 'Nueva Biblia de las Américas',
-    shortName: 'NBLA',
-    description: 'Traducción contemporánea con claridad literal y pastoral',
-  },
-  {
-    id: 'NVI',
-    name: 'Nueva Versión Internacional',
-    shortName: 'NVI',
-    description: 'Traducción ampliamente usada en estudios bíblicos y grupos',
-  },
-  {
-    id: 'BLPH',
-    name: 'Biblia en Lenguaje Actual',
-    shortName: 'BLPH',
-    description: 'Versión accesible y clara para predicación y lectura cotidiana',
-  },
-  {
-    id: 'SEV',
-    name: 'Sagradas Escrituras',
-    shortName: 'SEV',
-    description: 'Versión conservadora con énfasis en fidelidad textual',
-  },
-  {
-    id: 'LBLA',
-    name: 'La Biblia de Las Américas',
-    shortName: 'LBLA',
-    description: 'Edición moderna para lectura clara y vibrante en español',
+    description: 'Traducción clásica y predilecta para predicación y estudio bíblico',
   },
 ] as const;
 
