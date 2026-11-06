@@ -343,7 +343,13 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
         {/* Zero State if empty */}
         {cards.length === 0 && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center p-8 bg-white/70 dark:bg-stone-900/70 backdrop-blur-md rounded-2xl border border-stone-200 dark:border-stone-800 max-w-md shadow-sm">
-            <Sparkles className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+            <div className="w-12 h-12 rounded-2xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 p-1 mx-auto mb-3 shadow-xs">
+              <img
+                src="/assets/aistudio/rhema_4ffc7d10.jpg"
+                alt="Rhema Logo"
+                className="w-full h-full object-contain rounded-xl"
+              />
+            </div>
             <h3 className="font-cinzel font-bold text-stone-900 dark:text-stone-100 text-base mb-1">
               Lienzo Listo para la Palabra
             </h3>

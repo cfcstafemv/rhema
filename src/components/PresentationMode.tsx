@@ -67,9 +67,11 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
       {/* Presentation Top Bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#151923] backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <span className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center">
-            <Maximize2 className="w-4 h-4" />
-          </span>
+          <img
+            src="/assets/aistudio/rhema_4ffc7d10.jpg"
+            alt="Rhema Logo"
+            className="w-8 h-8 rounded-lg object-contain bg-white border border-stone-700 p-0.5 shrink-0"
+          />
           <div>
             <h1 className="text-base font-cinzel font-bold text-stone-100 tracking-wide">
               {sermon.title}

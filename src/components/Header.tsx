@@ -60,17 +60,24 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="border-b border-stone-200 dark:border-stone-800 bg-[#FBF9F5]/90 dark:bg-[#12141A]/90 backdrop-blur-md sticky top-0 z-30 transition-colors">
       {/* Strict One-Row Top Bar Contract (3 zones separated by gap-8) */}
       <div className="flex items-center justify-between gap-8 px-4 sm:px-6 py-2.5">
-        {/* Zone 1: Brand wordmark */}
+        {/* Zone 1: Brand wordmark with official logo */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center text-white shadow-sm ring-1 ring-amber-500/30">
-              <Sparkles className="w-4 h-4 text-amber-100" />
-            </span>
-            <span className="text-xl font-cinzel font-bold tracking-wider text-stone-900 dark:text-stone-100 whitespace-nowrap">
-              RHEMA
-            </span>
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/assets/aistudio/rhema_4ffc7d10.jpg"
+              alt="Rhema Logo"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs bg-white border border-stone-200/90 dark:border-stone-700/80 p-0.5 shrink-0"
+            />
+            <div className="flex flex-col">
+              <span className="text-lg sm:text-xl font-cinzel font-bold tracking-wider text-stone-900 dark:text-stone-100 leading-none">
+                RHEMA
+              </span>
+              <span className="text-[10px] text-stone-500 dark:text-stone-400 font-sans tracking-widest leading-none mt-0.5">
+                ῥῆμα
+              </span>
+            </div>
           </div>
-          <span className="hidden md:inline text-xs text-stone-400 dark:text-stone-500 font-serif italic">
+          <span className="hidden md:inline text-xs text-stone-400 dark:text-stone-500 font-serif italic border-l border-stone-300 dark:border-stone-700 pl-3">
             Estudio & Lienzo de Prédicas
           </span>
         </div>

@@ -42,9 +42,11 @@ export const SermonListModal: React.FC<SermonListModalProps> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-white/60 dark:bg-stone-900/60">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 flex items-center justify-center">
-              <FolderOpen className="w-4 h-4" />
-            </span>
+            <img
+              src="/assets/aistudio/rhema_4ffc7d10.jpg"
+              alt="Rhema Logo"
+              className="w-8 h-8 rounded-lg object-contain bg-white border border-stone-200 dark:border-stone-700 p-0.5"
+            />
             <div>
               <h2 className="text-base font-cinzel font-bold text-stone-900 dark:text-stone-100">
                 Mis Prédicas Guardadas

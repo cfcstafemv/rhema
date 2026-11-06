@@ -98,9 +98,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         {/* Modal Header */}
         <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-white/60 dark:bg-stone-900/60 no-print">
           <div className="flex items-center gap-2.5">
-            <span className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-400 flex items-center justify-center">
-              <Share2 className="w-4 h-4" />
-            </span>
+            <img
+              src="/assets/aistudio/rhema_4ffc7d10.jpg"
+              alt="Rhema Logo"
+              className="w-8 h-8 rounded-lg object-contain bg-white border border-stone-200 dark:border-stone-700 p-0.5"
+            />
             <div>
               <h2 className="text-base font-cinzel font-bold text-stone-900 dark:text-stone-100">
                 Exportar Resumen Visual
@@ -176,8 +178,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </div>
               </div>
 
-              <div className="w-10 h-10 rounded-xl bg-amber-700 text-white flex items-center justify-center font-cinzel font-bold text-lg shadow-sm">
-                Ω
+              <div className="w-12 h-12 rounded-xl bg-white border border-stone-300 p-1 flex items-center justify-center shadow-xs shrink-0">
+                <img
+                  src="/assets/aistudio/rhema_4ffc7d10.jpg"
+                  alt="Rhema Logo"
+                  className="w-full h-full object-contain"
+                />
               </div>
             </div>
 
