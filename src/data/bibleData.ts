@@ -111,7 +111,13 @@ export const BIBLE_TRANSLATIONS = [
     id: 'RVR1960',
     name: 'Reina Valera 1960',
     shortName: 'RVR1960',
-    description: 'Traducción clásica y pastoralia con texto tradicional',
+    description: 'Traducción clásica y pastoral con tradición reformada',
+  },
+  {
+    id: 'RVR60',
+    name: 'Reina-Valera 1960',
+    shortName: 'RVR60',
+    description: 'Versión clásica disponible en el catálogo oficial de la API',
   },
   {
     id: 'NTV',
@@ -124,6 +130,30 @@ export const BIBLE_TRANSLATIONS = [
     name: 'Nueva Biblia de las Américas',
     shortName: 'NBLA',
     description: 'Traducción contemporánea con claridad literal y pastoral',
+  },
+  {
+    id: 'NVI',
+    name: 'Nueva Versión Internacional',
+    shortName: 'NVI',
+    description: 'Traducción ampliamente usada en estudios bíblicos y grupos',
+  },
+  {
+    id: 'BLPH',
+    name: 'Biblia en Lenguaje Actual',
+    shortName: 'BLPH',
+    description: 'Versión accesible y clara para predicación y lectura cotidiana',
+  },
+  {
+    id: 'SEV',
+    name: 'Sagradas Escrituras',
+    shortName: 'SEV',
+    description: 'Versión conservadora con énfasis en fidelidad textual',
+  },
+  {
+    id: 'LBLA',
+    name: 'La Biblia de Las Américas',
+    shortName: 'LBLA',
+    description: 'Edición moderna para lectura clara y vibrante en español',
   },
 ] as const;
 
@@ -227,7 +257,7 @@ const SCRIPTURE_DATABASE: Record<string, Record<number, { verse: number; text: s
       { verse: 4, text: "Regocijaos en el Señor siempre. Otra vez digo: ¡Regocijaos!" },
       { verse: 6, text: "Por nada estéis afanosos, sino sean conocidas vuestras peticiones delante de Dios en toda oración y ruego, con acción de gracias." },
       { verse: 7, text: "Y la paz de Dios, que sobrepasa todo entendimiento, guardará vuestros corazones y vuestros pensamientos en Cristo Jesús." },
-      { verse: 8, text: "Por lo demás, hermanos, todo lo que es verdadero, todo lo honesto, todo lo justo, todo lo puro, todo lo amable, todo lo que es de buen nombre; si hay virtud alguna, si alguna alabanza, pensad en estas cosas." },
+      { verse: 8, text: "Por lo demás, hermanos, todo lo que es verdadero, todo lo honesto, todo lo justo, todo lo puro, todo lo amable, todo lo que es de buen nombre; si hay virtud alguna, si hay alabanza, pensad estas cosas." },
       { verse: 13, text: "Todo lo puedo en Cristo que me fortalece." }
     ]
   },
@@ -286,8 +316,8 @@ const SCRIPTURE_DATABASE: Record<string, Record<number, { verse: number; text: s
   },
   isa: {
     40: [
-      { verse: 28, text: "¿No has sabido, no has oído que el Dios eterno es Jehová, el cual creó los confines de la tierra? No desfallece, ni se fatiga con cansancio, y su entendimiento no ha sido limitado." },
-      { verse: 29, text: "Él da esfuerzo al cansado, y multiplica las fuerzas al que no tiene ningunas." },
+      { verse: 28, text: "¿No has sabido, no has oído que el Dios eterno es Jehová, el cual creó los confines de la tierra? No desfallece, ni se fatiga con cansancio, y su entendimiento no tiene medida." },
+      { verse: 29, text: "Él da esfuerzo al cansado, y multiplica las fuerzas al que no tiene ninguna." },
       { verse: 30, text: "Los muchachos se fatigan y se cansan, los jóvenes flaquean y caen;" },
       { verse: 31, text: "pero los que esperan a Jehová tendrán nuevas fuerzas; levantarán alas como las águilas; correrán, y no se cansarán; caminarán, y no se fatigarán." }
     ],
@@ -469,7 +499,7 @@ export const INITIAL_SAMPLE_SERMON: SermonNote = {
       id: 'card-4',
       type: 'action',
       title: 'Aplicación Práctica Semanal',
-      content: '1. Desactivar los pensamientos de condenación y acusación matutina recordando Rom 8:1.\n2. Orar por la situación familiar conflictiva reconociendo que Dios ya está obrando a bien.',
+      content: '1. Desactivar los pensamientos de condenación y acusación matutina recordando Rom 8:1.\n2. Orar por la situación familiar conflictiva reconociendo que Dios ya está obrando a su favor.',
       color: '#10B981',
       x: 440,
       y: 380,
@@ -526,4 +556,3 @@ export const INITIAL_SAMPLE_SERMON: SermonNote = {
   },
   updatedAt: Date.now(),
 };
-

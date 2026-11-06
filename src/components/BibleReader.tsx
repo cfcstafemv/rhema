@@ -1,27 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  BookOpen, 
-  Search, 
-  ChevronDown, 
-  Link2, 
-  Highlighter, 
-  Trash2, 
-  Plus, 
-  Sparkles, 
-  Bookmark, 
-  CheckCircle2, 
-  ClipboardPaste, 
-  Check, 
+import {
+  BookOpen,
+  Search,
+  ChevronDown,
+  Link2,
+  Highlighter,
+  Trash2,
+  Plus,
+  Sparkles,
+  Bookmark,
+  CheckCircle2,
+  ClipboardPaste,
+  Check,
   X,
-  Loader2
+  Loader2,
 } from 'lucide-react';
 import { BibleVerse, VerseHighlight, HighlightCategory, CardType } from '../types';
-import { 
-  BIBLE_BOOKS, 
-  BIBLE_TRANSLATIONS, 
-  HIGHLIGHT_CATEGORIES, 
-  getBibleVerses, 
-  saveCustomVerses 
+import {
+  BIBLE_BOOKS,
+  BIBLE_TRANSLATIONS,
+  HIGHLIGHT_CATEGORIES,
+  getBibleVerses,
+  saveCustomVerses,
 } from '../data/bibleData';
 import { getOrFetchChapterVerses } from '../services/bibleService';
 
@@ -36,6 +36,7 @@ interface BibleReaderProps {
   highlightedVerseId?: number | null;
   currentTranslation: string;
   onSelectTranslation: (translationId: string) => void;
+  translations?: Array<{ id: string; name: string; shortName: string; description: string }>;
 }
 
 export const BibleReader: React.FC<BibleReaderProps> = ({
@@ -49,6 +50,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   highlightedVerseId,
   currentTranslation,
   onSelectTranslation,
+  translations,
 }) => {
   const [searchBook, setSearchBook] = useState('');
   const [isBookDropdownOpen, setIsBookDropdownOpen] = useState(false);
@@ -64,10 +66,10 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const [isLoadingVerses, setIsLoadingVerses] = useState(false);
   const readerContainerRef = useRef<HTMLDivElement>(null);
 
+  const translationOptions = translations && translations.length > 0 ? translations : BIBLE_TRANSLATIONS;
   const currentBook = BIBLE_BOOKS.find((b) => b.id === activeBookId) || BIBLE_BOOKS[0];
-  const translationObj = BIBLE_TRANSLATIONS.find((t) => t.id === currentTranslation) || BIBLE_TRANSLATIONS[0];
+  const translationObj = translationOptions.find((t) => t.id === currentTranslation) || translationOptions[0];
 
-  // Async load verses from cache or open API
   useEffect(() => {
     let isMounted = true;
     const immediate = getBibleVerses(activeBookId, activeChapter, currentTranslation);
@@ -89,7 +91,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
     };
   }, [activeBookId, activeChapter, currentTranslation, refreshKey]);
 
-  // Filtered books for quick search
   const filteredBooks = BIBLE_BOOKS.filter((b) =>
     b.name.toLowerCase().includes(searchBook.toLowerCase()) ||
     b.shortName.toLowerCase().includes(searchBook.toLowerCase())
@@ -98,7 +99,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const otBooks = filteredBooks.filter((b) => b.testament === 'AT');
   const ntBooks = filteredBooks.filter((b) => b.testament === 'NT');
 
-  // Handle user mouse text selection
   const handleMouseUp = (verse: BibleVerse) => {
     const selection = window.getSelection();
     const text = selection ? selection.toString().trim() : '';
@@ -120,7 +120,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
     }
   };
 
-  // Close floating menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -135,7 +134,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Apply highlight
   const applyHighlight = (category: HighlightCategory, color: string) => {
     if (!activeVerseForMenu) return;
 
@@ -163,7 +161,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
     return newHighlightId;
   };
 
-  // Create linked card directly from current selection
   const handleCreateCardFromSelection = (cardType: CardType = 'central') => {
     if (!activeVerseForMenu) return;
 
@@ -198,7 +195,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
     setActiveVerseForMenu(null);
   };
 
-  // Handle saving custom pasted verses
   const handleSavePastedText = () => {
     if (!pastedText.trim()) return;
 
@@ -230,7 +226,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
     }
   };
 
-  // Check highlights for a verse
   const getHighlightsForVerse = (verseNum: number) => {
     return highlights.filter(
       (h) => h.bookId === activeBookId && h.chapter === activeChapter && h.verse === verseNum
@@ -239,10 +234,8 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[#FAF7F0] dark:bg-[#12141A] border-r border-stone-200 dark:border-stone-800 transition-colors select-text relative">
-      {/* Bible Selector & Translation Bar */}
       <div className="p-3 border-b border-stone-200 dark:border-stone-800 bg-[#FFFFFF] dark:bg-[#151821] flex flex-wrap items-center justify-between gap-2 shadow-2xs z-30">
         <div className="flex items-center gap-2">
-          {/* Book picker */}
           <div className="relative">
             <button
               onClick={() => {
@@ -257,17 +250,15 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
               <ChevronDown className="w-3.5 h-3.5 text-stone-400 ml-0.5" />
             </button>
 
-            {/* Click-outside backdrop shield */}
             {isBookDropdownOpen && (
-              <div 
+              <div
                 className="fixed inset-0 z-40 bg-black/25"
                 onClick={() => setIsBookDropdownOpen(false)}
               />
             )}
 
-            {/* Solid, non-transparent Book Picker Dropdown */}
             {isBookDropdownOpen && (
-              <div 
+              <div
                 className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 rounded-xl shadow-2xl border border-stone-300 dark:border-stone-700 z-50 p-3 max-h-96 flex flex-col isolate"
                 style={{ backgroundColor: '#ffffff' }}
               >
@@ -278,7 +269,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                     placeholder="Buscar libro bíblico..."
                     value={searchBook}
                     onChange={(e) => setSearchBook(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                     autoFocus
                   />
                 </div>
@@ -342,38 +333,35 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             )}
           </div>
 
-          {/* Translation selector */}
           <div className="relative">
             <button
               onClick={() => {
                 setIsTranslationDropdownOpen(!isTranslationDropdownOpen);
                 setIsBookDropdownOpen(false);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-700 dark:text-stone-300 text-xs font-mono font-bold transition-colors cursor-pointer border border-stone-200 dark:border-stone-700"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-700 dark:text-stone-300 text-xs font-mono font-bold transition-colors cursor-pointer"
               title="Cambiar versión o traducción de la Biblia"
             >
               <span>{translationObj.shortName}</span>
               <ChevronDown className="w-3 h-3 text-stone-400" />
             </button>
 
-            {/* Click-outside backdrop shield */}
             {isTranslationDropdownOpen && (
-              <div 
+              <div
                 className="fixed inset-0 z-40 bg-black/25"
                 onClick={() => setIsTranslationDropdownOpen(false)}
               />
             )}
 
-            {/* Solid, non-transparent Translation Picker */}
             {isTranslationDropdownOpen && (
-              <div 
+              <div
                 className="absolute top-full left-0 mt-1.5 w-64 rounded-xl shadow-2xl border border-stone-300 dark:border-stone-700 z-50 p-2 text-xs isolate"
                 style={{ backgroundColor: '#ffffff' }}
               >
                 <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1 block">
                   Traducciones de la Biblia
                 </span>
-                {BIBLE_TRANSLATIONS.map((t) => (
+                {translationOptions.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => {
@@ -395,10 +383,9 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
           </div>
         </div>
 
-        {/* Custom text paste / edit button */}
         <button
           onClick={() => setIsPasteModalOpen(true)}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
           title="Pegar o personalizar versículos de cualquier versión"
         >
           <ClipboardPaste className="w-3.5 h-3.5 text-amber-600" />
@@ -406,7 +393,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         </button>
       </div>
 
-      {/* Chapter selector */}
       <div className="px-3.5 py-1.5 bg-stone-100/80 dark:bg-stone-900/60 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 overflow-x-auto no-scrollbar z-10">
         <span className="text-xs text-stone-500 dark:text-stone-400 mr-1.5 font-serif shrink-0">Capítulo:</span>
         {Array.from({ length: Math.min(currentBook.chaptersCount, 25) }, (_, i) => i + 1).map((ch) => (
@@ -431,8 +417,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         )}
       </div>
 
-      {/* Bible text body */}
-      <div 
+      <div
         ref={readerContainerRef}
         className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-3.5 font-serif text-stone-800 dark:text-stone-200 leading-relaxed text-sm sm:text-base relative"
       >
@@ -526,11 +511,10 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         })}
       </div>
 
-      {/* Floating Selection / Highlight Toolbar */}
       {menuPosition && activeVerseForMenu && (
         <div
           id="bible-floating-toolbar"
-          className="fixed bg-stone-900/95 dark:bg-stone-950 text-white rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-2 border border-stone-700 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150"
+          className="fixed bg-stone-900/95 dark:bg-stone-950 text-white rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-2 border border-stone-700 backdrop-blur-md animate-in fade-in zoom-in-95"
           style={{
             left: `${Math.max(16, menuPosition.x - 120)}px`,
             top: `${menuPosition.y}px`,
@@ -605,7 +589,6 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         </div>
       )}
 
-      {/* Paste / Custom Verses Modal */}
       {isPasteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="w-full max-w-lg bg-white dark:bg-stone-900 rounded-2xl shadow-2xl border border-stone-200 dark:border-stone-800 p-5 space-y-4">
@@ -625,15 +608,15 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             </div>
 
             <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed font-sans">
-              Puedes copiar y pegar versículos directamente desde tu aplicación bíblica favorita (YouVersion, BibleGateway, Logos, etc.). Se detectarán los números de versículos automáticamente:
+              Puedes copiar y pegar versículos directamente desde tu aplicación bíblica favorita (YouVersion, BibleGateway, Logos, etc.). Se detectarán los números de versículos automáticamente y se guardarán en este capítulo.
             </p>
 
             <textarea
               value={pastedText}
               onChange={(e) => setPastedText(e.target.value)}
-              placeholder="Ejemplo:&#10;1 Al tercer día se hicieron unas bodas en Caná de Galilea...&#10;2 Y fueron también invitados Jesús y sus discípulos...&#10;3 Y faltando el vino, la madre de Jesús le dijo..."
+              placeholder="Ejemplo:&#10;1 Al tercer día se hicieron unas bodas en Caná de Galilea...&#10;2 Y fueron también invitados Jesús y sus discípulos...&#10;3 Y faltando el vino..."
               rows={8}
-              className="w-full text-xs font-serif p-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-hidden focus:ring-1 focus:ring-amber-500 leading-relaxed"
+              className="w-full text-xs font-serif p-3 rounded-xl border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
             />
 
             <div className="flex items-center justify-end gap-2 pt-2">

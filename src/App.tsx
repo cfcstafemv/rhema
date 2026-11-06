@@ -7,14 +7,15 @@ import { PresentationMode } from './components/PresentationMode';
 import { ExportModal } from './components/ExportModal';
 import { SermonListModal } from './components/SermonListModal';
 import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection } from './types';
-import { 
-  getActiveSermon, 
-  getAllSermons, 
-  saveSermon, 
-  createNewSermon, 
-  deleteSermon 
+import {
+  getActiveSermon,
+  getAllSermons,
+  saveSermon,
+  createNewSermon,
+  deleteSermon
 } from './services/storage';
-import { BIBLE_BOOKS, CARD_TYPES } from './data/bibleData';
+import { BIBLE_BOOKS, CARD_TYPES, BIBLE_TRANSLATIONS } from './data/bibleData';
+import { getAvailableBibleTranslations } from './services/bibleService';
 
 export default function App() {
   const [sermons, setSermons] = useState<SermonNote[]>([]);
@@ -22,22 +23,19 @@ export default function App() {
   const [activeView, setActiveView] = useState<'split' | 'canvas-only' | 'bible-only'>('split');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentTranslation, setCurrentTranslation] = useState('RVR1960');
-
-  // Modals state
+  const [availableTranslations, setAvailableTranslations] = useState(BIBLE_TRANSLATIONS);
   const [isReflectionsOpen, setIsReflectionsOpen] = useState(false);
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSermonsListOpen, setIsSermonsListOpen] = useState(false);
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
 
-  // Load sermons on mount
   useEffect(() => {
     const loaded = getAllSermons();
     setSermons(loaded);
     const active = getActiveSermon();
     setSermon(active);
 
-    // Initial theme check
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     const storedTheme = localStorage.getItem('rhema_theme');
     if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
@@ -49,7 +47,30 @@ export default function App() {
     }
   }, []);
 
-  // Theme toggle
+  useEffect(() => {
+    let isMounted = true;
+
+    getAvailableBibleTranslations()
+      .then((translations) => {
+        if (!isMounted) return;
+        setAvailableTranslations(translations);
+        setCurrentTranslation((existing) =>
+          translations.some((translation) => translation.id === existing)
+            ? existing
+            : translations[0]?.id ?? 'RVR1960'
+        );
+      })
+      .catch(() => {
+        if (isMounted) {
+          setAvailableTranslations(BIBLE_TRANSLATIONS);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const handleToggleDarkMode = () => {
     const next = !isDarkMode;
     setIsDarkMode(next);
@@ -62,14 +83,12 @@ export default function App() {
     }
   };
 
-  // Auto-save sermon on change
   const updateAndSaveSermon = (updated: SermonNote) => {
     setSermon(updated);
     saveSermon(updated);
     setSermons(getAllSermons());
   };
 
-  // Sermon metadata update
   const handleUpdateSermonMeta = (updates: Partial<SermonNote>) => {
     const updated: SermonNote = {
       ...sermon,
@@ -79,7 +98,6 @@ export default function App() {
     updateAndSaveSermon(updated);
   };
 
-  // Bible Passage Navigation
   const handleSelectPassage = (bookId: string, chapter: number) => {
     const book = BIBLE_BOOKS.find((b) => b.id === bookId);
     const updated: SermonNote = {
@@ -91,7 +109,6 @@ export default function App() {
     updateAndSaveSermon(updated);
   };
 
-  // Add highlight to verse
   const handleAddHighlight = (highlightData: Omit<VerseHighlight, 'id' | 'createdAt'>): string => {
     const newId = 'hl-' + Date.now();
     const newHighlight: VerseHighlight = {
@@ -109,7 +126,6 @@ export default function App() {
     return newId;
   };
 
-  // Remove highlight and clean up any associated links
   const handleRemoveHighlight = (highlightId: string) => {
     const updated: SermonNote = {
       ...sermon,
@@ -125,7 +141,6 @@ export default function App() {
     updateAndSaveSermon(updated);
   };
 
-  // Create card linked to highlighted quote or verse
   const handleCreateLinkedCard = (
     highlightId: string,
     quote: string,
@@ -134,8 +149,6 @@ export default function App() {
   ) => {
     const typeInfo = CARD_TYPES.find((t) => t.id === cardType) || CARD_TYPES[0];
     const newCardId = 'card-' + Date.now();
-
-    // Place card staggered near previous or top center
     const cardCount = sermon.cards.length;
     const posX = 40 + (cardCount % 3) * 340;
     const posY = 50 + Math.floor(cardCount / 3) * 260;
@@ -173,15 +186,13 @@ export default function App() {
     };
 
     updateAndSaveSermon(updated);
-    setActiveView('split'); // Ensure split view so both verse and card are visible!
+    setActiveView('split');
   };
 
-  // Add independent card to canvas
   const handleAddCard = (cardType: CardType) => {
     const typeInfo = CARD_TYPES.find((t) => t.id === cardType) || CARD_TYPES[0];
     const newCardId = 'card-' + Date.now();
     const cardCount = sermon.cards.length;
-
     const posX = 60 + (cardCount % 3) * 330;
     const posY = 60 + Math.floor(cardCount / 3) * 250;
 
@@ -206,7 +217,6 @@ export default function App() {
     updateAndSaveSermon(updated);
   };
 
-  // Update single card
   const handleUpdateCard = (id: string, updates: Partial<FloatingCard>) => {
     const updated: SermonNote = {
       ...sermon,
@@ -216,7 +226,6 @@ export default function App() {
     updateAndSaveSermon(updated);
   };
 
-  // Delete card
   const handleDeleteCard = (id: string) => {
     const updated: SermonNote = {
       ...sermon,
@@ -227,7 +236,6 @@ export default function App() {
     updateAndSaveSermon(updated);
   };
 
-  // Update personal reflection
   const handleUpdateReflection = (updates: Partial<PersonalReflection>) => {
     const updated: SermonNote = {
       ...sermon,
@@ -241,7 +249,6 @@ export default function App() {
     updateAndSaveSermon(updated);
   };
 
-  // Convert reflection to floating card on canvas
   const handleConvertReflectionToCard = (title: string, content: string) => {
     const newCardId = 'card-' + Date.now();
     const newCard: FloatingCard = {
@@ -266,9 +273,7 @@ export default function App() {
     setIsReflectionsOpen(false);
   };
 
-  // Navigate to verse referenced by card
   const handleNavigateToLinkedVerse = (verseRef: string) => {
-    // E.g. "Romanos 8:31"
     const match = verseRef.match(/^([\w\s]+)\s+(\d+):(\d+)$/);
     if (match) {
       const bookName = match[1].trim();
@@ -284,7 +289,6 @@ export default function App() {
         setHighlightedVerseId(verse);
         setActiveView('split');
 
-        // Scroll to verse after DOM update
         setTimeout(() => {
           const el = document.getElementById(`verse-${foundBook.id}-${chapter}-${verse}`);
           if (el) {
@@ -295,7 +299,6 @@ export default function App() {
     }
   };
 
-  // Sermon Switch / Create
   const handleSelectSermon = (s: SermonNote) => {
     setSermon(s);
     localStorage.setItem('rhema_active_sermon_id_v1', s.id);
@@ -315,7 +318,6 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] text-stone-900 dark:text-stone-100">
-      {/* Top Header */}
       <Header
         sermon={sermon}
         isDarkMode={isDarkMode}
@@ -330,9 +332,7 @@ export default function App() {
         onViewChange={setActiveView}
       />
 
-      {/* Main Workspace Area */}
       <main className="flex-1 flex overflow-hidden relative">
-        {/* Left Side: Bible Reader (Visible in 'split' or 'bible-only') */}
         {(activeView === 'split' || activeView === 'bible-only') && (
           <div
             className={`h-full transition-all duration-200 z-10 ${
@@ -352,11 +352,11 @@ export default function App() {
               highlightedVerseId={highlightedVerseId}
               currentTranslation={currentTranslation}
               onSelectTranslation={setCurrentTranslation}
+              translations={availableTranslations}
             />
           </div>
         )}
 
-        {/* Right Side: Canvas Board (Visible in 'split' or 'canvas-only') */}
         {(activeView === 'split' || activeView === 'canvas-only') && (
           <div className="flex-1 h-full relative">
             <CanvasBoard
@@ -373,7 +373,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Modals & Overlays */}
       <PersonalReflectionsModal
         isOpen={isReflectionsOpen}
         onClose={() => setIsReflectionsOpen(false)}
