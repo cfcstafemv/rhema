@@ -75,6 +75,19 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.id === 'canvas-interactive-area' ||
+      target.id === 'canvas-svg-layer'
+    ) {
+      if (e.touches.length === 1) {
+        setIsPanning(true);
+        setStartPan({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
+      }
+    }
+  };
+
   useEffect(() => {
     if (!isPanning) return;
 
@@ -85,15 +98,30 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       });
     };
 
-    const handleMouseUp = () => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        setPan({
+          x: e.touches[0].clientX - startPan.x,
+          y: e.touches[0].clientY - startPan.y,
+        });
+      }
+    };
+
+    const handleEnd = () => {
       setIsPanning(false);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleEnd);
+    window.addEventListener('touchcancel', handleEnd);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
     };
   }, [isPanning, startPan]);
 
@@ -209,6 +237,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       <div
         id="canvas-interactive-area"
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         className={`w-full h-full relative cursor-default ${isPanning ? 'cursor-grabbing' : ''}`}
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,

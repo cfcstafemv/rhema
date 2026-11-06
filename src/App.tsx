@@ -8,6 +8,14 @@ import { ExportModal } from './components/ExportModal';
 import { SermonListModal } from './components/SermonListModal';
 import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection } from './types';
 import {
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  Layers,
+  HeartHandshake,
+  Maximize2,
+} from 'lucide-react';
+import {
   getActiveSermon,
   getAllSermons,
   saveSermon,
@@ -21,6 +29,7 @@ export default function App() {
   const [sermons, setSermons] = useState<SermonNote[]>([]);
   const [sermon, setSermon] = useState<SermonNote>(getActiveSermon());
   const [activeView, setActiveView] = useState<'split' | 'canvas-only' | 'bible-only'>('split');
+  const [isBibleCollapsed, setIsBibleCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentTranslation, setCurrentTranslation] = useState('RVR1960');
   const [availableTranslations, setAvailableTranslations] = useState<BibleTranslationOption[]>(BIBLE_TRANSLATIONS as any);
@@ -333,32 +342,59 @@ export default function App() {
       />
 
       <main className="flex-1 flex overflow-hidden relative">
+        {/* Collapsible Bible Panel with Sliding Drawer Animation */}
         {(activeView === 'split' || activeView === 'bible-only') && (
           <div
-            className={`h-full transition-all duration-200 z-10 ${
+            className={`h-full transition-all duration-300 ease-in-out z-20 flex shrink-0 ${
               activeView === 'bible-only'
                 ? 'w-full'
-                : 'w-full md:w-[420px] lg:w-[480px] xl:w-[540px] shrink-0'
+                : isBibleCollapsed
+                ? 'w-0'
+                : 'w-full md:w-[400px] lg:w-[460px] xl:w-[500px]'
             }`}
           >
-            <BibleReader
-              activeBookId={sermon.activePassage.bookId}
-              activeChapter={sermon.activePassage.chapter}
-              highlights={sermon.highlights}
-              onSelectPassage={handleSelectPassage}
-              onAddHighlight={handleAddHighlight}
-              onRemoveHighlight={handleRemoveHighlight}
-              onCreateLinkedCard={handleCreateLinkedCard}
-              highlightedVerseId={highlightedVerseId}
-              currentTranslation={currentTranslation}
-              onSelectTranslation={setCurrentTranslation}
-              translations={availableTranslations}
-            />
+            <div className={`h-full w-full overflow-hidden transition-opacity duration-200 ${isBibleCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+              <BibleReader
+                activeBookId={sermon.activePassage.bookId}
+                activeChapter={sermon.activePassage.chapter}
+                highlights={sermon.highlights}
+                onSelectPassage={handleSelectPassage}
+                onAddHighlight={handleAddHighlight}
+                onRemoveHighlight={handleRemoveHighlight}
+                onCreateLinkedCard={handleCreateLinkedCard}
+                highlightedVerseId={highlightedVerseId}
+                currentTranslation={currentTranslation}
+                onSelectTranslation={setCurrentTranslation}
+                translations={availableTranslations}
+                onToggleCollapse={() => setIsBibleCollapsed(true)}
+              />
+            </div>
           </div>
         )}
 
+        {/* Sliding Arrow Tab to Toggle / Slide Bible Panel (Visible on Split View) */}
+        {activeView === 'split' && (
+          <button
+            onClick={() => setIsBibleCollapsed(!isBibleCollapsed)}
+            className={`absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-7 h-16 sm:w-6 sm:h-14 bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white shadow-xl hover:shadow-2xl transition-all duration-300 rounded-r-xl border border-l-0 border-amber-600/70 cursor-pointer active:scale-95 group ${
+              isBibleCollapsed
+                ? 'left-0'
+                : 'left-[calc(100%-28px)] md:left-[400px] lg:left-[460px] xl:left-[500px]'
+            }`}
+            title={isBibleCollapsed ? 'Deslizar para abrir la Biblia' : 'Ocultar Biblia para expandir lienzo'}
+            aria-label={isBibleCollapsed ? 'Abrir Biblia' : 'Ocultar Biblia'}
+          >
+            {isBibleCollapsed ? (
+              <ChevronRight className="w-4 h-4 text-white animate-pulse group-hover:scale-110 transition-transform" />
+            ) : (
+              <ChevronLeft className="w-4 h-4 text-white group-hover:scale-110 transition-transform" />
+            )}
+          </button>
+        )}
+
+        {/* Canvas Board Area */}
         {(activeView === 'split' || activeView === 'canvas-only') && (
-          <div className="flex-1 h-full relative">
+          <div className="flex-1 h-full relative overflow-hidden">
             <CanvasBoard
               cards={sermon.cards}
               links={sermon.links}
@@ -367,11 +403,77 @@ export default function App() {
               onDeleteCard={handleDeleteCard}
               onAddCard={handleAddCard}
               onNavigateToLinkedVerse={handleNavigateToLinkedVerse}
-              isSplitView={activeView === 'split'}
+              isSplitView={activeView === 'split' && !isBibleCollapsed}
             />
           </div>
         )}
       </main>
+
+      {/* Mobile & Tablet Quick Bottom Navigation Bar (Hidden on Desktop) */}
+      <nav className="sm:hidden flex items-center justify-around bg-white/95 dark:bg-[#12141A]/95 border-t border-stone-200 dark:border-stone-800 py-1.5 px-2 z-30 backdrop-blur-md">
+        <button
+          onClick={() => {
+            setActiveView('bible-only');
+            setIsBibleCollapsed(false);
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+            activeView === 'bible-only'
+              ? 'text-amber-700 dark:text-amber-400 font-bold'
+              : 'text-stone-500 hover:text-stone-800 dark:text-stone-400'
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Biblia</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveView('canvas-only');
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+            activeView === 'canvas-only'
+              ? 'text-amber-700 dark:text-amber-400 font-bold'
+              : 'text-stone-500 hover:text-stone-800 dark:text-stone-400'
+          }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Lienzo</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveView('split');
+            setIsBibleCollapsed(false);
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+            activeView === 'split'
+              ? 'text-amber-700 dark:text-amber-400 font-bold'
+              : 'text-stone-500 hover:text-stone-800 dark:text-stone-400'
+          }`}
+        >
+          <div className="flex items-center gap-0.5">
+            <BookOpen className="w-3.5 h-3.5" />
+            <Layers className="w-3.5 h-3.5" />
+          </div>
+          <span>Dividida</span>
+        </button>
+
+        <button
+          onClick={() => setIsReflectionsOpen(true)}
+          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium text-stone-500 hover:text-stone-800 dark:text-stone-400 transition-colors cursor-pointer"
+        >
+          <HeartHandshake className="w-4 h-4 text-pink-500" />
+          <span>Diario</span>
+        </button>
+
+        <button
+          onClick={() => setIsPresentationOpen(true)}
+          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium text-stone-500 hover:text-stone-800 dark:text-stone-400 transition-colors cursor-pointer"
+        >
+          <Maximize2 className="w-4 h-4 text-amber-500" />
+          <span>Modo Culto</span>
+        </button>
+      </nav>
 
       <PersonalReflectionsModal
         isOpen={isReflectionsOpen}

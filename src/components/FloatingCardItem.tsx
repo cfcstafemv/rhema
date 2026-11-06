@@ -50,7 +50,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
 
   const cardTypeInfo = CARD_TYPES.find((t) => t.id === card.type) || CARD_TYPES[0];
 
-  // Dragging logic
+  // Dragging logic - Mouse
   const handleMouseDown = (e: React.MouseEvent) => {
     // Only drag from the card header or drag handle, not from input/textarea
     const target = e.target as HTMLElement;
@@ -75,6 +75,31 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
     });
   };
 
+  // Dragging logic - Touch (Tablet & Phone)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' || 
+      target.tagName === 'TEXTAREA' || 
+      target.tagName === 'BUTTON' ||
+      target.closest('button') ||
+      target.closest('.no-drag')
+    ) {
+      onBringToFront(card.id);
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      onBringToFront(card.id);
+      setIsDragging(true);
+      setDragOffset({
+        x: touch.clientX / zoomScale - card.x,
+        y: touch.clientY / zoomScale - card.y,
+      });
+    }
+  };
+
   useEffect(() => {
     if (!isDragging) return;
 
@@ -87,15 +112,33 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
       });
     };
 
-    const handleMouseUp = () => {
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const newX = Math.round(touch.clientX / zoomScale - dragOffset.x);
+        const newY = Math.round(touch.clientY / zoomScale - dragOffset.y);
+        onUpdate(card.id, {
+          x: Math.max(10, newX),
+          y: Math.max(10, newY),
+        });
+      }
+    };
+
+    const handleEnd = () => {
       setIsDragging(false);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleEnd);
+    window.addEventListener('touchcancel', handleEnd);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleEnd);
+      window.removeEventListener('touchcancel', handleEnd);
     };
   }, [isDragging, dragOffset, zoomScale, card.id, onUpdate]);
 
@@ -120,7 +163,8 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
       ref={cardRef}
       id={`floating-card-${card.id}`}
       onMouseDown={handleMouseDown}
-      className={`absolute select-none rounded-xl bg-white dark:bg-stone-900 border transition-shadow duration-150 ${
+      onTouchStart={handleTouchStart}
+      className={`absolute select-none rounded-xl bg-white dark:bg-stone-900 border transition-shadow duration-150 touch-none ${
         isDragging
           ? 'shadow-2xl ring-2 ring-amber-500/50 cursor-grabbing'
           : 'shadow-md hover:shadow-lg'

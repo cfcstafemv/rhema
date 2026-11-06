@@ -3,6 +3,7 @@ import {
   BookOpen,
   Search,
   ChevronDown,
+  ChevronLeft,
   Link2,
   Highlighter,
   Trash2,
@@ -37,6 +38,7 @@ interface BibleReaderProps {
   currentTranslation: string;
   onSelectTranslation: (translationId: string) => void;
   translations?: Array<{ id: string; name: string; shortName: string; description: string }>;
+  onToggleCollapse?: () => void;
 }
 
 export const BibleReader: React.FC<BibleReaderProps> = ({
@@ -51,6 +53,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   currentTranslation,
   onSelectTranslation,
   translations,
+  onToggleCollapse,
 }) => {
   const [searchBook, setSearchBook] = useState('');
   const [isBookDropdownOpen, setIsBookDropdownOpen] = useState(false);
@@ -383,14 +386,28 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => setIsPasteModalOpen(true)}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
-          title="Pegar o personalizar versículos de cualquier versión"
-        >
-          <ClipboardPaste className="w-3.5 h-3.5 text-amber-600" />
-          <span className="hidden sm:inline">Pegar Pasaje</span>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setIsPasteModalOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+            title="Pegar o personalizar versículos de cualquier versión"
+          >
+            <ClipboardPaste className="w-3.5 h-3.5 text-amber-600" />
+            <span className="hidden sm:inline">Pegar Pasaje</span>
+          </button>
+
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-200/70 dark:hover:bg-stone-800 transition-colors cursor-pointer"
+              title="Ocultar Biblia para expandir el lienzo"
+              aria-label="Ocultar panel bíblico"
+            >
+              <ChevronLeft className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+              <span className="hidden sm:inline">Ocultar</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="px-3.5 py-1.5 bg-stone-100/80 dark:bg-stone-900/60 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 overflow-x-auto no-scrollbar z-10">
