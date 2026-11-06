@@ -43,7 +43,7 @@ export const SermonListModal: React.FC<SermonListModalProps> = ({
         <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-white/60 dark:bg-stone-900/60">
           <div className="flex items-center gap-2.5">
             <img
-              src="/assets/aistudio/rhema_4ffc7d10.jpg"
+              src="/assets/aistudio/rhema2_97cdc8b7.jpg"
               alt="Rhema Logo"
               className="w-8 h-8 rounded-lg object-contain bg-white border border-stone-200 dark:border-stone-700 p-0.5"
             />

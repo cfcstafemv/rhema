@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <img
-              src="/assets/aistudio/rhema_4ffc7d10.jpg"
+              src="/assets/aistudio/rhema2_97cdc8b7.jpg"
               alt="Rhema Logo"
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs bg-white border border-stone-200/90 dark:border-stone-700/80 p-0.5 shrink-0"
             />

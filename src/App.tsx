@@ -38,6 +38,19 @@ export default function App() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSermonsListOpen, setIsSermonsListOpen] = useState(false);
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
+  const [showSplash, setShowSplash] = useState(true);
+  const [isFadingOut, setIsFadingOut] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsFadingOut(true);
+      const removeTimer = setTimeout(() => {
+        setShowSplash(false);
+      }, 500);
+      return () => clearTimeout(removeTimer);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const loaded = getAllSermons();
@@ -326,7 +339,27 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] text-stone-900 dark:text-stone-100">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] text-stone-900 dark:text-stone-100 relative">
+      {showSplash && (
+        <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FBF9F5] dark:bg-[#0E1015] transition-opacity duration-500 ${isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 p-2 shadow-2xl animate-bounce flex items-center justify-center mb-4">
+            <img
+              src="/assets/aistudio/rhema2_97cdc8b7.jpg"
+              alt="Rhema Logo"
+              className="w-full h-full object-contain rounded-2xl"
+            />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-cinzel font-bold text-stone-900 dark:text-stone-100 tracking-wider">
+            RHEMA
+          </h1>
+          <span className="text-xs text-stone-500 dark:text-stone-400 font-sans tracking-widest mt-1">
+            ῥῆμα
+          </span>
+          <span className="text-xs text-amber-700 dark:text-amber-400 font-serif italic mt-3">
+            Estudio & Lienzo de Prédicas
+          </span>
+        </div>
+      )}
       <Header
         sermon={sermon}
         isDarkMode={isDarkMode}
