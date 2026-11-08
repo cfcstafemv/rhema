@@ -11,7 +11,8 @@ import {
   Lightbulb, 
   Compass,
   Palette,
-  ExternalLink
+  ExternalLink,
+  PenLine
 } from 'lucide-react';
 import { FloatingCard, CardType } from '../types';
 import { CARD_TYPES } from '../data/bibleData';
@@ -23,6 +24,8 @@ interface FloatingCardItemProps {
   onBringToFront: (id: string) => void;
   onNavigateToLinkedVerse?: (verseRef: string) => void;
   zoomScale: number;
+  typeLabels?: Record<CardType, string>;
+  onOpenEditDefaults?: () => void;
 }
 
 const COLOR_OPTIONS = [
@@ -42,11 +45,14 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
   onBringToFront,
   onNavigateToLinkedVerse,
   zoomScale,
+  typeLabels,
+  onOpenEditDefaults,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const cardTypeInfo = CARD_TYPES.find((t) => t.id === card.type) || CARD_TYPES[0];
 
@@ -190,15 +196,41 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           {renderTypeIcon()}
           <select
             value={card.type}
-            onChange={(e) => onUpdate(card.id, { type: e.target.value as CardType })}
+            onChange={(e) => {
+              if (e.target.value === '__edit_defaults__') {
+                if (onOpenEditDefaults) onOpenEditDefaults();
+                return;
+              }
+              onUpdate(card.id, { type: e.target.value as CardType });
+            }}
             className="no-drag text-[11px] font-sans font-semibold bg-transparent border-0 text-stone-700 dark:text-stone-300 focus:ring-0 cursor-pointer"
           >
             {CARD_TYPES.map((t) => (
               <option key={t.id} value={t.id} className="bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200">
-                {t.label}
+                {(typeLabels && typeLabels[t.id as CardType]) || t.label}
               </option>
             ))}
+            {onOpenEditDefaults && (
+              <option value="__edit_defaults__" className="bg-amber-50 dark:bg-amber-950 font-bold text-amber-800 dark:text-amber-300">
+                ✏️ Editar títulos predeterminados...
+              </option>
+            )}
           </select>
+
+          {onOpenEditDefaults && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenEditDefaults();
+              }}
+              className="p-1 text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors no-drag cursor-pointer"
+              title="Editar títulos predeterminados"
+              aria-label="Editar títulos predeterminados"
+            >
+              <PenLine className="w-2.5 h-2.5" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
@@ -251,22 +283,45 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
 
       {/* Card Content Area */}
       <div className={`p-3.5 space-y-2.5 ${card.isMinimized ? 'hidden' : 'block'}`}>
-        {/* Title Input */}
-        <input
-          type="text"
-          value={card.title}
-          onChange={(e) => onUpdate(card.id, { title: e.target.value })}
-          placeholder="Título del punto o mensaje..."
-          className="w-full text-sm font-bold font-serif text-stone-900 dark:text-stone-100 bg-transparent border-0 border-b border-transparent hover:border-stone-200 dark:hover:border-stone-700 focus:border-amber-500 focus:outline-hidden px-0 py-0.5 transition-colors"
-        />
+        {/* Editable Title Container */}
+        <div 
+          className="relative group/title no-drag touch-auto select-text rounded-lg p-1 -m-1 transition-colors hover:bg-stone-100/70 dark:hover:bg-stone-800/40"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={card.title}
+              onChange={(e) => onUpdate(card.id, { title: e.target.value })}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              placeholder="Título del punto o mensaje..."
+              className="flex-1 text-sm font-bold font-serif text-stone-900 dark:text-stone-100 bg-transparent border-b border-dashed border-stone-300 dark:border-stone-700 hover:border-amber-500 focus:border-solid focus:border-amber-600 focus:outline-hidden px-1 py-0.5 transition-colors no-drag select-text touch-auto"
+              title="Haz clic o toca para editar el título"
+            />
+            <button
+              type="button"
+              onClick={() => titleInputRef.current?.focus()}
+              className="p-1 text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors opacity-70 group-hover/title:opacity-100 no-drag shrink-0 cursor-pointer"
+              title="Editar título"
+              aria-label="Editar título"
+            >
+              <PenLine className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
 
         {/* Content Note Textarea */}
         <textarea
           value={card.content}
           onChange={(e) => onUpdate(card.id, { content: e.target.value })}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
           placeholder="Escribe las notas, argumentos del pastor, preguntas o citas..."
           rows={3}
-          className="w-full text-xs font-sans text-stone-700 dark:text-stone-300 bg-transparent resize-y border-0 focus:outline-hidden p-0 leading-relaxed placeholder:text-stone-400"
+          className="w-full text-xs font-sans text-stone-700 dark:text-stone-300 bg-transparent resize-y border-0 focus:outline-hidden p-1 leading-relaxed placeholder:text-stone-400 no-drag select-text touch-auto"
         />
 
         {/* Linked Scripture Reference Ribbon */}
@@ -295,10 +350,24 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
         )}
       </div>
 
-      {/* Minimized preview label */}
+      {/* Minimized preview label with editable title */}
       {card.isMinimized && (
-        <div className="px-3 py-2 text-xs font-serif font-bold text-stone-800 dark:text-stone-200 truncate">
-          {card.title || 'Tarjeta minimizada'}
+        <div 
+          className="px-3 py-1.5 flex items-center gap-1.5 no-drag touch-auto select-text"
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <input
+            type="text"
+            value={card.title}
+            onChange={(e) => onUpdate(card.id, { title: e.target.value })}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            placeholder="Título de la tarjeta..."
+            className="w-full text-xs font-serif font-bold text-stone-800 dark:text-stone-200 bg-transparent border-b border-dashed border-stone-300 dark:border-stone-700 hover:border-amber-500 focus:border-amber-600 focus:outline-hidden py-0.5 transition-colors no-drag"
+            title="Editar título de la tarjeta"
+          />
+          <PenLine className="w-3 h-3 text-stone-400 shrink-0" />
         </div>
       )}
     </div>

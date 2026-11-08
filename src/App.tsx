@@ -20,7 +20,8 @@ import {
   getAllSermons,
   saveSermon,
   createNewSermon,
-  deleteSermon
+  deleteSermon,
+  getCustomCardTypeLabels
 } from './services/storage';
 import { BIBLE_BOOKS, CARD_TYPES, BIBLE_TRANSLATIONS } from './data/bibleData';
 import { getAvailableBibleTranslations, BibleTranslationOption } from './services/bibleService';
@@ -170,6 +171,7 @@ export default function App() {
     cardType: CardType
   ) => {
     const typeInfo = CARD_TYPES.find((t) => t.id === cardType) || CARD_TYPES[0];
+    const customLabels = getCustomCardTypeLabels();
     const newCardId = 'card-' + Date.now();
     const cardCount = sermon.cards.length;
     const posX = 40 + (cardCount % 3) * 340;
@@ -178,7 +180,7 @@ export default function App() {
     const newCard: FloatingCard = {
       id: newCardId,
       type: cardType,
-      title: cardType === 'central' ? 'Verdad Central' : `Nota sobre ${verseRef}`,
+      title: cardType === 'central' ? (customLabels.central || 'Verdad Central') : `Nota sobre ${verseRef}`,
       content: `Reflexión inspirada en: "${quote}"`,
       color: typeInfo.color,
       x: posX,
@@ -197,7 +199,7 @@ export default function App() {
       fromVerseRef: verseRef,
       toCardId: newCardId,
       color: typeInfo.color,
-      label: typeInfo.label,
+      label: customLabels[cardType] || typeInfo.label,
     };
 
     const updated: SermonNote = {
@@ -213,6 +215,7 @@ export default function App() {
 
   const handleAddCard = (cardType: CardType) => {
     const typeInfo = CARD_TYPES.find((t) => t.id === cardType) || CARD_TYPES[0];
+    const customLabels = getCustomCardTypeLabels();
     const newCardId = 'card-' + Date.now();
     const cardCount = sermon.cards.length;
     const posX = 60 + (cardCount % 3) * 330;
@@ -221,7 +224,7 @@ export default function App() {
     const newCard: FloatingCard = {
       id: newCardId,
       type: cardType,
-      title: typeInfo.label,
+      title: customLabels[cardType] || typeInfo.label,
       content: '',
       color: typeInfo.color,
       x: posX,

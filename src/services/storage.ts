@@ -1,8 +1,54 @@
-import { SermonNote } from '../types';
+import { SermonNote, CardType } from '../types';
 import { INITIAL_SAMPLE_SERMON } from '../data/bibleData';
 
 const STORAGE_KEY = 'rhema_sermons_v1';
 const ACTIVE_SERMON_KEY = 'rhema_active_sermon_id_v1';
+const CARD_TYPE_LABELS_KEY = 'rhema_custom_card_type_labels_v1';
+
+export const DEFAULT_CARD_TYPE_LABELS: Record<CardType, string> = {
+  central: 'Mensaje Central',
+  point: 'Punto Principal',
+  action: 'Aplicación Práctica',
+  illustration: 'Ilustración / Ejemplo',
+  cross: 'Cita Cruzada',
+};
+
+export function getCustomCardTypeLabels(): Record<CardType, string> {
+  try {
+    const raw = localStorage.getItem(CARD_TYPE_LABELS_KEY);
+    if (!raw) return { ...DEFAULT_CARD_TYPE_LABELS };
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_CARD_TYPE_LABELS, ...parsed };
+  } catch {
+    return { ...DEFAULT_CARD_TYPE_LABELS };
+  }
+}
+
+export function saveCustomCardTypeLabels(labels: Partial<Record<CardType, string>>): Record<CardType, string> {
+  const current = getCustomCardTypeLabels();
+  const updated = { ...current, ...labels };
+  try {
+    localStorage.setItem(CARD_TYPE_LABELS_KEY, JSON.stringify(updated));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('rhema_card_types_updated', { detail: updated }));
+    }
+  } catch (e) {
+    console.error('Error saving custom card type labels', e);
+  }
+  return updated;
+}
+
+export function resetCustomCardTypeLabels(): Record<CardType, string> {
+  try {
+    localStorage.removeItem(CARD_TYPE_LABELS_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('rhema_card_types_updated', { detail: DEFAULT_CARD_TYPE_LABELS }));
+    }
+  } catch (e) {
+    console.error('Error resetting card type labels', e);
+  }
+  return { ...DEFAULT_CARD_TYPE_LABELS };
+}
 
 export function getAllSermons(): SermonNote[] {
   try {

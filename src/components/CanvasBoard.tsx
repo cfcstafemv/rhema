@@ -10,11 +10,14 @@ import {
   CheckCircle2, 
   Lightbulb, 
   Compass,
-  Move
+  Move,
+  Settings2
 } from 'lucide-react';
 import { FloatingCard, ConnectionLink, VerseHighlight, CardType } from '../types';
 import { FloatingCardItem } from './FloatingCardItem';
 import { CARD_TYPES } from '../data/bibleData';
+import { getCustomCardTypeLabels } from '../services/storage';
+import { EditCardTypesModal } from './EditCardTypesModal';
 
 interface CanvasBoardProps {
   cards: FloatingCard[];
@@ -42,8 +45,18 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [typeLabels, setTypeLabels] = useState<Record<CardType, string>>(getCustomCardTypeLabels());
+  const [isEditCardTypesOpen, setIsEditCardTypesOpen] = useState(false);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 800 });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setTypeLabels(getCustomCardTypeLabels());
+    };
+    window.addEventListener('rhema_card_types_updated', handleUpdate);
+    return () => window.removeEventListener('rhema_card_types_updated', handleUpdate);
+  }, []);
 
   // Resize observer to track dimensions for SVG lines
   useEffect(() => {
@@ -186,9 +199,22 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300 transition-colors text-left cursor-pointer"
                 >
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: t.color }} />
-                  <span className="font-medium">{t.label}</span>
+                  <span className="font-medium">{typeLabels[t.id as CardType] || t.label}</span>
                 </button>
               ))}
+
+              <div className="border-t border-stone-200 dark:border-stone-800 my-1" />
+
+              <button
+                onClick={() => {
+                  setIsEditCardTypesOpen(true);
+                  setIsAddMenuOpen(false);
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 transition-colors text-left font-semibold text-[11px] cursor-pointer"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                <span>Editar títulos predeterminados...</span>
+              </button>
             </div>
           )}
         </div>
@@ -337,6 +363,8 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
             onBringToFront={handleBringToFront}
             onNavigateToLinkedVerse={onNavigateToLinkedVerse}
             zoomScale={zoom}
+            typeLabels={typeLabels}
+            onOpenEditDefaults={() => setIsEditCardTypesOpen(true)}
           />
         ))}
 
@@ -360,11 +388,18 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
               onClick={() => onAddCard('central')}
               className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
             >
-              Crear Mensaje Central
+              Crear {typeLabels.central || 'Mensaje Central'}
             </button>
           </div>
         )}
       </div>
+
+      {/* Edit Default Card Type Titles Modal */}
+      <EditCardTypesModal
+        isOpen={isEditCardTypesOpen}
+        onClose={() => setIsEditCardTypesOpen(false)}
+        onLabelsUpdated={(updated) => setTypeLabels(updated)}
+      />
     </div>
   );
 };

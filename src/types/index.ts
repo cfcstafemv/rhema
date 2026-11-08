@@ -27,6 +27,7 @@ export interface VerseHighlight {
 export interface FloatingCard {
   id: string;
   type: CardType;
+  customTypeLabel?: string;
   title: string;
   content: string;
   color: string;
