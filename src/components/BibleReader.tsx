@@ -15,6 +15,7 @@ import {
   Check,
   X,
   Loader2,
+  Lightbulb,
 } from 'lucide-react';
 import { BibleVerse, VerseHighlight, HighlightCategory, CardType } from '../types';
 import {
@@ -102,45 +103,107 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const otBooks = filteredBooks.filter((b) => b.testament === 'AT');
   const ntBooks = filteredBooks.filter((b) => b.testament === 'NT');
 
-  const handleMouseUp = (verse: BibleVerse) => {
+  // Robust text selection checking for desktop and mobile
+  const checkTextSelection = () => {
     const selection = window.getSelection();
-    const text = selection ? selection.toString().trim() : '';
+    if (!selection || selection.isCollapsed) return;
 
-    if (text.length > 0) {
-      const range = selection?.getRangeAt(0);
-      const rect = range?.getBoundingClientRect();
+    const text = selection.toString().trim();
+    if (!text || text.length === 0) return;
 
-      if (rect) {
-        setSelectedText(text);
-        setActiveVerseForMenu(verse);
-        setSelectedHighlightId(null);
-        setMenuPosition({
-          x: Math.min(rect.left + rect.width / 2, window.innerWidth - 180),
-          y: Math.max(rect.top - 55, 60),
-        });
-        return;
+    // Ignore selections originating inside the floating toolbar itself
+    const anchorElem =
+      selection.anchorNode instanceof HTMLElement
+        ? selection.anchorNode
+        : selection.anchorNode?.parentElement;
+    const focusElem =
+      selection.focusNode instanceof HTMLElement
+        ? selection.focusNode
+        : selection.focusNode?.parentElement;
+
+    if (
+      anchorElem?.closest('#bible-floating-toolbar') ||
+      focusElem?.closest('#bible-floating-toolbar')
+    ) {
+      return;
+    }
+
+    const verseElem = (anchorElem?.closest('.bible-verse-row') ||
+      focusElem?.closest('.bible-verse-row')) as HTMLElement | null;
+
+    if (verseElem) {
+      const verseAttr = verseElem.getAttribute('data-verse');
+      const verseNum = verseAttr ? parseInt(verseAttr, 10) : null;
+      const verse = verses.find((v) => Number(v.verse) === Number(verseNum));
+
+      if (verse) {
+        try {
+          const range = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          setSelectedText(text);
+          setActiveVerseForMenu(verse);
+          setSelectedHighlightId(null);
+          setMenuPosition({
+            x: Math.min(Math.max(16, rect.left + rect.width / 2), window.innerWidth - 180),
+            y: Math.max(rect.top - 65, 75),
+          });
+        } catch {
+          const rect = verseElem.getBoundingClientRect();
+          setSelectedText(text);
+          setActiveVerseForMenu(verse);
+          setSelectedHighlightId(null);
+          setMenuPosition({
+            x: Math.min(Math.max(16, rect.left + 80), window.innerWidth - 180),
+            y: Math.max(rect.top - 65, 75),
+          });
+        }
       }
     }
   };
 
+  // Selection change listener for touch devices and mouse release
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    const handleSelectionChange = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        const sel = window.getSelection();
+        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+          checkTextSelection();
+        }
+      }, 150);
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      clearTimeout(timeout);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [verses]);
+
+  // Click outside to dismiss toolbar safely without interrupting verse interactions
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (!target.closest('#bible-floating-toolbar') && !target.closest('.verse-text-span')) {
+      if (
+        !target.closest('#bible-floating-toolbar') &&
+        !target.closest('.bible-verse-row') &&
+        !target.closest('.verse-highlight-trigger')
+      ) {
         setMenuPosition(null);
         setSelectedText('');
         setActiveVerseForMenu(null);
         setSelectedHighlightId(null);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
   const applyHighlight = (category: HighlightCategory, color: string) => {
     if (!activeVerseForMenu) return;
 
-    const textToHighlight = selectedText || activeVerseForMenu.text;
+    const textToHighlight = (selectedText || activeVerseForMenu.text).trim();
 
     const newHighlightId = onAddHighlight({
       bookId: activeVerseForMenu.bookId,
@@ -231,7 +294,10 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
   const getHighlightsForVerse = (verseNum: number) => {
     return highlights.filter(
-      (h) => h.bookId === activeBookId && h.chapter === activeChapter && h.verse === verseNum
+      (h) =>
+        h.bookId?.toLowerCase() === activeBookId?.toLowerCase() &&
+        Number(h.chapter) === Number(activeChapter) &&
+        Number(h.verse) === Number(verseNum)
     );
   };
 
@@ -436,6 +502,10 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
       <div
         ref={readerContainerRef}
+        onMouseUp={checkTextSelection}
+        onTouchEnd={() => {
+          setTimeout(checkTextSelection, 120);
+        }}
         className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-3.5 font-serif text-stone-800 dark:text-stone-200 leading-relaxed text-sm sm:text-base relative"
       >
         <div className="text-center pb-3 border-b border-stone-200/60 dark:border-stone-800/60">
@@ -456,20 +526,35 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             <div
               key={v.verse}
               id={`verse-${activeBookId}-${activeChapter}-${v.verse}`}
-              onMouseUp={() => handleMouseUp(v)}
-              className={`p-2 rounded-lg transition-all relative group cursor-text ${
+              data-verse={v.verse}
+              className={`bible-verse-row p-2 rounded-xl transition-all relative group cursor-text ${
                 isTargeted
-                  ? 'bg-amber-100 dark:bg-amber-950/60 ring-2 ring-amber-500 shadow-sm'
+                  ? 'bg-amber-100/90 dark:bg-amber-950/70 ring-2 ring-amber-500 shadow-sm'
                   : 'hover:bg-stone-100/70 dark:hover:bg-stone-800/40'
               }`}
             >
               <div className="flex items-start gap-2">
-                <span className="font-mono text-xs font-bold text-amber-700 dark:text-amber-500 select-none pt-0.5 shrink-0 w-6">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveVerseForMenu(v);
+                    setSelectedText(v.text);
+                    setSelectedHighlightId(null);
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    setMenuPosition({
+                      x: rect.left,
+                      y: Math.max(rect.top - 65, 75),
+                    });
+                  }}
+                  className="font-mono text-xs font-bold text-amber-700 dark:text-amber-500 hover:text-amber-900 dark:hover:text-amber-300 hover:underline select-none pt-0.5 shrink-0 w-6 text-left cursor-pointer verse-highlight-trigger"
+                  title="Toca para resaltar versículo"
+                >
                   {v.verse}
-                </span>
+                </button>
 
                 <div className="flex-1">
-                  <span className="verse-text-span">
+                  <span className="verse-text-span select-text">
                     {renderVerseContent(v.text, verseHighlights, (hl) => {
                       setSelectedHighlightId(hl.id);
                       setActiveVerseForMenu(v);
@@ -508,17 +593,21 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                 </div>
 
                 <button
-                  onClick={() => {
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setActiveVerseForMenu(v);
                     setSelectedText(v.text);
                     setSelectedHighlightId(null);
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                     setMenuPosition({
-                      x: 200,
-                      y: 150,
+                      x: rect.left,
+                      y: Math.max(rect.top - 65, 75),
                     });
                   }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 cursor-pointer"
-                  title="Resaltar versículo completo"
+                  className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 transition-opacity p-1.5 text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 cursor-pointer verse-highlight-trigger shrink-0"
+                  title="Resaltar versículo"
+                  aria-label={`Resaltar versículo ${v.verse}`}
                 >
                   <Highlighter className="w-3.5 h-3.5" />
                 </button>
@@ -531,33 +620,56 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
       {menuPosition && activeVerseForMenu && (
         <div
           id="bible-floating-toolbar"
-          className="fixed bg-stone-900/95 dark:bg-stone-950 text-white rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-2 border border-stone-700 backdrop-blur-md animate-in fade-in zoom-in-95"
-          style={{
-            left: `${Math.max(16, menuPosition.x - 120)}px`,
-            top: `${menuPosition.y}px`,
-            maxWidth: '360px',
-          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          className="fixed z-50 bg-stone-900/95 dark:bg-stone-950 text-white rounded-2xl shadow-2xl p-2.5 flex flex-col gap-2.5 border border-stone-700 backdrop-blur-md animate-in fade-in zoom-in-95 w-[92vw] sm:w-[320px] max-w-[340px] left-1/2 -translate-x-1/2 bottom-[75px] sm:bottom-auto sm:left-auto sm:translate-x-0"
+          style={
+            typeof window !== 'undefined' && window.innerWidth >= 640
+              ? {
+                  left: `${Math.min(Math.max(16, menuPosition.x - 140), window.innerWidth - 340)}px`,
+                  top: `${Math.min(Math.max(70, menuPosition.y), window.innerHeight - 220)}px`,
+                }
+              : undefined
+          }
         >
-          <div className="px-2 pt-1 pb-1.5 border-b border-stone-800 text-[11px] text-stone-300 flex items-center justify-between">
-            <span className="font-serif font-bold text-amber-400 truncate max-w-[200px]">
-              {activeVerseForMenu.bookName} {activeVerseForMenu.chapter}:{activeVerseForMenu.verse}
-            </span>
-            <span className="text-[10px] text-stone-400">
-              {selectedText ? 'Selección' : 'Versículo'}
-            </span>
+          <div className="px-1.5 pt-0.5 pb-1 border-b border-stone-800 text-xs text-stone-300 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 truncate max-w-[230px]">
+              <span className="font-serif font-bold text-amber-400 truncate">
+                {activeVerseForMenu.bookName} {activeVerseForMenu.chapter}:{activeVerseForMenu.verse}
+              </span>
+              <span className="text-[10px] text-stone-400 shrink-0">
+                ({selectedText && selectedText !== activeVerseForMenu.text ? 'Selección' : 'Versículo'})
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuPosition(null);
+                setSelectedText('');
+                setActiveVerseForMenu(null);
+                setSelectedHighlightId(null);
+              }}
+              className="p-1 text-stone-400 hover:text-white rounded transition-colors cursor-pointer"
+              title="Cerrar"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
 
-          <div className="flex items-center gap-1.5 px-1">
-            <span className="text-[10px] text-stone-400 mr-1">Color:</span>
-            {HIGHLIGHT_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => applyHighlight(cat.id, cat.color)}
-                className="w-5 h-5 rounded-full transition-transform hover:scale-125 focus:ring-2 focus:ring-white cursor-pointer relative"
-                style={{ backgroundColor: cat.color }}
-                title={`${cat.name} (${cat.description})`}
-              />
-            ))}
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[10px] text-stone-400">Color:</span>
+            <div className="flex items-center gap-2">
+              {HIGHLIGHT_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => applyHighlight(cat.id, cat.color)}
+                  className="w-7 h-7 sm:w-6 sm:h-6 rounded-full transition-transform hover:scale-125 active:scale-95 focus:ring-2 focus:ring-white cursor-pointer relative shadow-sm"
+                  style={{ backgroundColor: cat.color }}
+                  title={`${cat.name} (${cat.description})`}
+                  aria-label={`Resaltar ${cat.name}`}
+                />
+              ))}
+            </div>
 
             {selectedHighlightId && (
               <button
@@ -573,33 +685,33 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             )}
           </div>
 
-          <div className="pt-1 border-t border-stone-800 grid grid-cols-2 gap-1 text-[11px]">
+          <div className="pt-1.5 border-t border-stone-800 grid grid-cols-2 gap-1.5 text-[11px]">
             <button
               onClick={() => handleCreateCardFromSelection('central')}
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-amber-600/80 hover:bg-amber-600 text-white font-medium transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-amber-600/80 hover:bg-amber-600 text-white font-medium transition-colors cursor-pointer"
             >
               <Sparkles className="w-3 h-3" />
               <span>Mensaje Central</span>
             </button>
             <button
               onClick={() => handleCreateCardFromSelection('point')}
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-600 text-white font-medium transition-colors cursor-pointer"
             >
               <Bookmark className="w-3 h-3" />
               <span>Punto Clave</span>
             </button>
             <button
               onClick={() => handleCreateCardFromSelection('action')}
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-emerald-600/80 hover:bg-emerald-600 text-white font-medium transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-600 text-white font-medium transition-colors cursor-pointer"
             >
               <CheckCircle2 className="w-3 h-3" />
               <span>Aplicación</span>
             </button>
             <button
               onClick={() => handleCreateCardFromSelection('illustration')}
-              className="flex items-center justify-center gap-1 px-2 py-1 rounded bg-pink-600/80 hover:bg-pink-600 text-white font-medium transition-colors cursor-pointer"
+              className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg bg-pink-600/80 hover:bg-pink-600 text-white font-medium transition-colors cursor-pointer"
             >
-              <Link2 className="w-3 h-3" />
+              <Lightbulb className="w-3 h-3" />
               <span>Ilustración</span>
             </button>
           </div>
@@ -667,12 +779,15 @@ function renderVerseContent(
   }
 
   const sortedHighlights = [...highlights].sort(
-    (a, b) => b.selectedText.length - a.selectedText.length
+    (a, b) => (b.selectedText?.length || 0) - (a.selectedText?.length || 0)
   );
 
   let parts: { text: string; highlight?: VerseHighlight }[] = [{ text }];
 
   sortedHighlights.forEach((hl) => {
+    const rawTarget = hl.selectedText?.trim();
+    if (!rawTarget) return;
+
     const nextParts: { text: string; highlight?: VerseHighlight }[] = [];
 
     parts.forEach((part) => {
@@ -681,13 +796,23 @@ function renderVerseContent(
         return;
       }
 
-      const index = part.text.indexOf(hl.selectedText);
+      // Case-insensitive substring match
+      const lowerPart = part.text.toLowerCase();
+      const lowerTarget = rawTarget.toLowerCase();
+      let index = lowerPart.indexOf(lowerTarget);
+
+      // If exact substring not found, check if this is the entire verse text matching
+      if (index === -1 && (lowerPart.trim() === lowerTarget || (hl.fullVerseText && lowerPart.trim() === hl.fullVerseText.trim().toLowerCase()))) {
+        index = 0;
+      }
+
       if (index === -1) {
         nextParts.push(part);
       } else {
+        const matchLength = Math.min(part.text.length - index, rawTarget.length || part.text.length);
         const before = part.text.substring(0, index);
-        const match = part.text.substring(index, index + hl.selectedText.length);
-        const after = part.text.substring(index + hl.selectedText.length);
+        const match = part.text.substring(index, index + matchLength);
+        const after = part.text.substring(index + matchLength);
 
         if (before) nextParts.push({ text: before });
         nextParts.push({ text: match, highlight: hl });
@@ -711,13 +836,13 @@ function renderVerseContent(
               e.stopPropagation();
               onHighlightClick(hl);
             }}
-            className="cursor-pointer px-1 py-0.5 rounded font-medium transition-all hover:brightness-110"
+            className="cursor-pointer px-1 py-0.5 rounded font-medium transition-all hover:brightness-110 shadow-2xs"
             style={{
               backgroundColor: `${hl.color}35`,
               color: 'inherit',
-              borderBottom: `2px solid ${hl.color}`,
+              borderBottom: `2.5px solid ${hl.color}`,
             }}
-            title={`Resaltado: ${hl.category} · Clic para opciones`}
+            title={`Resaltado: ${hl.category} · Toca para opciones`}
           >
             {part.text}
           </mark>
