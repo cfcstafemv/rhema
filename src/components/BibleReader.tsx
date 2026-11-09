@@ -328,17 +328,16 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
             {isBookDropdownOpen && (
               <div
-                className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 rounded-xl shadow-2xl border border-stone-300 dark:border-stone-700 z-50 p-3 max-h-96 flex flex-col isolate"
-                style={{ backgroundColor: '#ffffff' }}
+                className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#181B22] text-stone-900 dark:text-stone-100 z-50 p-3 max-h-96 flex flex-col isolate"
               >
                 <div className="relative mb-2.5">
-                  <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-2.5" />
+                  <Search className="w-3.5 h-3.5 text-stone-400 dark:text-stone-400 absolute left-2.5 top-2.5" />
                   <input
                     type="text"
                     placeholder="Buscar libro bíblico..."
                     value={searchBook}
                     onChange={(e) => setSearchBook(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-stone-300 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-stone-300 dark:border-stone-600 bg-stone-50 dark:bg-stone-800 text-stone-900 dark:text-stone-100 placeholder-stone-400 dark:placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
                     autoFocus
                   />
                 </div>
@@ -346,7 +345,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                 <div className="overflow-y-auto flex-1 space-y-3 pr-1 text-xs">
                   {ntBooks.length > 0 && (
                     <div>
-                      <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-400 uppercase tracking-wider block mb-1">
+                      <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider block mb-1.5">
                         Nuevo Testamento
                       </span>
                       <div className="grid grid-cols-2 gap-1">
@@ -358,10 +357,10 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                               setIsBookDropdownOpen(false);
                               setSearchBook('');
                             }}
-                            className={`text-left px-2 py-1 rounded transition-colors cursor-pointer ${
+                            className={`text-left px-2 py-1.5 rounded-lg transition-colors cursor-pointer text-xs ${
                               b.id === activeBookId
-                                ? 'bg-amber-100 dark:bg-amber-950 font-semibold text-amber-900 dark:text-amber-200'
-                                : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
+                                ? 'bg-amber-100 dark:bg-amber-900/60 font-bold text-amber-950 dark:text-amber-200 ring-1 ring-amber-500/50'
+                                : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-100 font-medium'
                             }`}
                           >
                             {b.name}
@@ -373,7 +372,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
                   {otBooks.length > 0 && (
                     <div>
-                      <span className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider block mb-1">
+                      <span className="text-[11px] font-bold text-stone-600 dark:text-stone-300 uppercase tracking-wider block mb-1.5">
                         Antiguo Testamento
                       </span>
                       <div className="grid grid-cols-2 gap-1">
@@ -385,10 +384,10 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                               setIsBookDropdownOpen(false);
                               setSearchBook('');
                             }}
-                            className={`text-left px-2 py-1 rounded transition-colors cursor-pointer ${
+                            className={`text-left px-2 py-1.5 rounded-lg transition-colors cursor-pointer text-xs ${
                               b.id === activeBookId
-                                ? 'bg-amber-100 dark:bg-amber-950 font-semibold text-amber-900 dark:text-amber-200'
-                                : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
+                                ? 'bg-amber-100 dark:bg-amber-900/60 font-bold text-amber-950 dark:text-amber-200 ring-1 ring-amber-500/50'
+                                : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-100 font-medium'
                             }`}
                           >
                             {b.name}
@@ -408,7 +407,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                 setIsTranslationDropdownOpen(!isTranslationDropdownOpen);
                 setIsBookDropdownOpen(false);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 text-stone-700 dark:text-stone-300 text-xs font-mono font-bold transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-100 text-xs font-mono font-bold transition-colors cursor-pointer border border-stone-200 dark:border-stone-700 shadow-2xs"
               title="Cambiar versión o traducción de la Biblia"
             >
               <span>{translationObj.shortName}</span>
@@ -424,10 +423,9 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
             {isTranslationDropdownOpen && (
               <div
-                className="absolute top-full left-0 mt-1.5 w-64 rounded-xl shadow-2xl border border-stone-300 dark:border-stone-700 z-50 p-2 text-xs isolate"
-                style={{ backgroundColor: '#ffffff' }}
+                className="absolute top-full left-0 mt-1.5 w-68 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#181B22] text-stone-900 dark:text-stone-100 z-50 p-2.5 text-xs isolate"
               >
-                <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider px-2 py-1 block">
+                <span className="text-[10px] font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider px-2 py-1 block">
                   Traducciones de la Biblia
                 </span>
                 {translationOptions.map((t) => (
@@ -437,14 +435,14 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                       onSelectTranslation(t.id);
                       setIsTranslationDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg transition-colors flex flex-col cursor-pointer ${
+                    className={`w-full text-left px-2.5 py-2 rounded-lg transition-colors flex flex-col gap-0.5 cursor-pointer ${
                       t.id === currentTranslation
-                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 font-semibold'
-                        : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-300'
+                        ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-950 dark:text-amber-200 font-bold ring-1 ring-amber-500/50'
+                        : 'hover:bg-stone-100 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200'
                     }`}
                   >
-                    <span className="font-bold">{t.name} ({t.shortName})</span>
-                    <span className="text-[10px] text-stone-500 dark:text-stone-400 line-clamp-1">{t.description}</span>
+                    <span className="font-bold text-stone-900 dark:text-stone-100">{t.name} ({t.shortName})</span>
+                    <span className="text-[11px] text-stone-500 dark:text-stone-400 line-clamp-1">{t.description}</span>
                   </button>
                 ))}
               </div>
@@ -476,8 +474,8 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         </div>
       </div>
 
-      <div className="px-3.5 py-1.5 bg-stone-100/80 dark:bg-stone-900/60 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 overflow-x-auto no-scrollbar z-10">
-        <span className="text-xs text-stone-500 dark:text-stone-400 mr-1.5 font-serif shrink-0">Capítulo:</span>
+      <div className="px-3.5 py-1.5 bg-stone-100/80 dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 overflow-x-auto no-scrollbar z-10">
+        <span className="text-xs text-stone-700 dark:text-stone-300 mr-1.5 font-serif font-semibold shrink-0">Capítulo:</span>
         {Array.from({ length: Math.min(currentBook.chaptersCount, 25) }, (_, i) => i + 1).map((ch) => (
           <button
             key={ch}
@@ -485,14 +483,14 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             className={`w-6 h-6 shrink-0 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
               ch === activeChapter
                 ? 'bg-amber-700 text-white shadow-2xs font-bold'
-                : 'text-stone-600 dark:text-stone-400 hover:bg-stone-200 dark:hover:bg-stone-800'
+                : 'text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100'
             }`}
           >
             {ch}
           </button>
         ))}
         {currentBook.chaptersCount > 25 && (
-          <span className="text-xs text-stone-400 px-1 font-mono">+{currentBook.chaptersCount - 25}</span>
+          <span className="text-xs text-stone-500 dark:text-stone-400 px-1 font-mono">+{currentBook.chaptersCount - 25}</span>
         )}
 
         {isLoadingVerses && (
