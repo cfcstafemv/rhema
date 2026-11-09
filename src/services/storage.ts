@@ -148,3 +148,103 @@ export function deleteSermon(id: string): SermonNote[] {
   localStorage.setItem(ACTIVE_SERMON_KEY, finalAll[0].id);
   return finalAll;
 }
+
+export function exportSermonToJson(sermon: SermonNote): void {
+  if (typeof window === 'undefined') return;
+  const jsonStr = JSON.stringify(sermon, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const cleanTitle = (sermon.title || 'Predica').replace(/[\s\W]+/g, '_');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Rhema_${cleanTitle}.rhema.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function exportAllSermonsToJson(): void {
+  if (typeof window === 'undefined') return;
+  const all = getAllSermons();
+  const jsonStr = JSON.stringify(all, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const dateStr = new Date().toISOString().split('T')[0];
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Rhema_Todas_Las_Predicas_${dateStr}.rhema.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function importSermonsFromJson(jsonString: string): {
+  success: boolean;
+  count: number;
+  importedSermon?: SermonNote;
+  error?: string;
+} {
+  try {
+    const parsed = JSON.parse(jsonString);
+    const existing = getAllSermons();
+
+    // Check if it's an array of sermons
+    if (Array.isArray(parsed)) {
+      const validSermons = parsed.filter(
+        (s) => s && typeof s.title === 'string' && Array.isArray(s.cards)
+      );
+      if (validSermons.length === 0) {
+        return {
+          success: false,
+          count: 0,
+          error: 'El archivo no contiene un formato de prédica válido de Rhema.',
+        };
+      }
+
+      const mergedMap = new Map<string, SermonNote>();
+      existing.forEach((s) => mergedMap.set(s.id, s));
+      validSermons.forEach((s) => mergedMap.set(s.id, s));
+
+      const newAll = Array.from(mergedMap.values());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(newAll));
+      localStorage.setItem(ACTIVE_SERMON_KEY, validSermons[0].id);
+
+      return {
+        success: true,
+        count: validSermons.length,
+        importedSermon: validSermons[0],
+      };
+    }
+
+    // Check if it's a single sermon
+    if (parsed && typeof parsed.title === 'string' && Array.isArray(parsed.cards)) {
+      const sermonToImport: SermonNote = {
+        ...parsed,
+        id: parsed.id || 'sermon-' + Date.now(),
+        updatedAt: Date.now(),
+      };
+      saveSermon(sermonToImport);
+      localStorage.setItem(ACTIVE_SERMON_KEY, sermonToImport.id);
+
+      return {
+        success: true,
+        count: 1,
+        importedSermon: sermonToImport,
+      };
+    }
+
+    return {
+      success: false,
+      count: 0,
+      error: 'Estructura del archivo de prédica no reconocida.',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      count: 0,
+      error: err.message || 'Error al procesar el archivo JSON.',
+    };
+  }
+}

@@ -9,11 +9,13 @@ import {
   Share2, 
   BookOpen, 
   CheckCircle2, 
-  HeartHandshake
+  HeartHandshake,
+  FileJson,
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import confetti from 'canvas-confetti';
 import { SermonNote } from '../types';
+import { exportSermonToJson } from '../services/storage';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -127,11 +129,27 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                exportSermonToJson(sermon);
+                confetti({
+                  particleCount: 40,
+                  spread: 55,
+                  origin: { y: 0.7 },
+                });
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 dark:border-amber-700/70 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 transition-colors font-medium cursor-pointer"
+              title="Descarga el archivo completo (.rhema.json) para abrir e interactuar en otro dispositivo"
+            >
+              <FileJson className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+              <span>Archivo Rhema (.json)</span>
+            </button>
+
+            <button
               onClick={handleCopyWhatsApp}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 transition-colors font-medium cursor-pointer"
             >
               {copiedText ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-stone-500" />}
-              <span>{copiedText ? 'Copiado al portapapeles' : 'Copiar para WhatsApp'}</span>
+              <span>{copiedText ? 'Copiado' : 'WhatsApp'}</span>
             </button>
 
             <button

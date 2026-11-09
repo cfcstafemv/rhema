@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   FolderOpen, 
   X, 
@@ -8,9 +8,20 @@ import {
   User, 
   Trash2, 
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Upload,
+  Download,
+  FileJson,
+  Check,
+  AlertCircle
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { SermonNote } from '../types';
+import { 
+  exportSermonToJson, 
+  exportAllSermonsToJson, 
+  importSermonsFromJson 
+} from '../services/storage';
 
 interface SermonListModalProps {
   isOpen: boolean;
@@ -20,6 +31,7 @@ interface SermonListModalProps {
   onSelectSermon: (sermon: SermonNote) => void;
   onNewSermon: () => void;
   onDeleteSermon: (id: string) => void;
+  onImportSuccess?: (imported: SermonNote) => void;
 }
 
 export const SermonListModal: React.FC<SermonListModalProps> = ({
@@ -30,8 +42,54 @@ export const SermonListModal: React.FC<SermonListModalProps> = ({
   onSelectSermon,
   onNewSermon,
   onDeleteSermon,
+  onImportSuccess,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   if (!isOpen) return null;
+
+  const handleTriggerImport = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (!content) return;
+
+      const result = importSermonsFromJson(content);
+      if (result.success && result.importedSermon) {
+        setFeedbackMsg({
+          type: 'success',
+          text: `¡${result.count > 1 ? `${result.count} prédicas importadas` : `Prédica "${result.importedSermon.title}" importada`} con éxito!`,
+        });
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.7 },
+        });
+        if (onImportSuccess) {
+          onImportSuccess(result.importedSermon);
+        }
+        setTimeout(() => setFeedbackMsg(null), 3500);
+      } else {
+        setFeedbackMsg({
+          type: 'error',
+          text: result.error || 'No se pudo importar el archivo. Verifica que sea un archivo válido de Rhema (.json).',
+        });
+        setTimeout(() => setFeedbackMsg(null), 4000);
+      }
+    };
+    reader.readAsText(file);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs animate-in fade-in duration-150">
@@ -65,11 +123,61 @@ export const SermonListModal: React.FC<SermonListModalProps> = ({
           </button>
         </div>
 
-        {/* Action button */}
-        <div className="p-3 bg-stone-100/70 dark:bg-stone-900/40 border-b border-stone-200 dark:border-stone-800 flex justify-between items-center">
-          <span className="text-xs text-stone-500">
-            Selecciona una prédica para abrir su lienzo
-          </span>
+        {/* Hidden File Input for Import */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept=".json,application/json"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
+        {/* Feedback Alert Banner */}
+        {feedbackMsg && (
+          <div
+            className={`mx-4 mt-3 p-3 rounded-xl flex items-center gap-2 text-xs font-medium animate-in fade-in duration-200 ${
+              feedbackMsg.type === 'success'
+                ? 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200'
+                : 'bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200'
+            }`}
+          >
+            {feedbackMsg.type === 'success' ? (
+              <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+            )}
+            <span className="flex-1">{feedbackMsg.text}</span>
+            <button
+              onClick={() => setFeedbackMsg(null)}
+              className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 p-0.5"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* Action ribbon */}
+        <div className="p-3 bg-stone-100/70 dark:bg-stone-900/40 border-b border-stone-200 dark:border-stone-800 flex flex-wrap justify-between items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleTriggerImport}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs font-medium transition-colors cursor-pointer"
+              title="Cargar un archivo .json de prédica exportado desde otro dispositivo"
+            >
+              <Upload className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+              <span>Importar (.json)</span>
+            </button>
+
+            <button
+              onClick={() => exportAllSermonsToJson()}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-800 dark:text-stone-200 text-xs font-medium transition-colors cursor-pointer"
+              title="Descargar un único archivo con todas las prédicas guardadas"
+            >
+              <Download className="w-3.5 h-3.5 text-stone-500" />
+              <span>Respaldar Todo</span>
+            </button>
+          </div>
+
           <button
             onClick={() => {
               onNewSermon();
@@ -130,13 +238,24 @@ export const SermonListModal: React.FC<SermonListModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      exportSermonToJson(s);
+                    }}
+                    className="p-1.5 text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 rounded-lg transition-colors cursor-pointer"
+                    title="Descargar archivo (.json) de esta prédica para transferir a otro dispositivo"
+                  >
+                    <FileJson className="w-4 h-4" />
+                  </button>
+
                   {sermons.length > 1 && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onDeleteSermon(s.id);
                       }}
-                      className="p-1.5 text-stone-400 hover:text-rose-600 rounded-lg transition-colors"
+                      className="p-1.5 text-stone-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                       title="Eliminar prédica"
                     >
                       <Trash2 className="w-4 h-4" />

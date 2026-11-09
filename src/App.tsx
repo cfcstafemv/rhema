@@ -341,6 +341,12 @@ export default function App() {
     setSermon(getActiveSermon());
   };
 
+  const handleImportSuccess = (imported: SermonNote) => {
+    setSermons(getAllSermons());
+    setSermon(imported);
+    localStorage.setItem('rhema_active_sermon_id_v1', imported.id);
+  };
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] text-stone-900 dark:text-stone-100 relative">
       {showSplash && (
@@ -540,6 +546,7 @@ export default function App() {
         onSelectSermon={handleSelectSermon}
         onNewSermon={handleNewSermon}
         onDeleteSermon={handleDeleteSermon}
+        onImportSuccess={handleImportSuccess}
       />
     </div>
   );
