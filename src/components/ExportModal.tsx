@@ -101,7 +101,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         <div className="p-4 sm:p-5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-white/60 dark:bg-stone-900/60 no-print">
           <div className="flex items-center gap-2.5">
             <img
-              src="/assets/aistudio/rhema2_97cdc8b7.jpg"
+              src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
               alt="Rhema Logo"
               className="w-8 h-8 rounded-lg object-contain bg-white border border-stone-200 dark:border-stone-700 p-0.5"
             />
@@ -181,9 +181,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             {/* Top Header */}
             <div className="border-b-2 border-stone-800 pb-4 flex items-start justify-between">
               <div>
-                <span className="text-[11px] font-bold tracking-widest text-amber-800 uppercase font-sans">
-                  {sermon.churchName || 'Comunidad de Fe'} · Serie: {sermon.series || 'Enseñanza'}
-                </span>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                    {sermon.category || 'Predicas Dominicales'}
+                  </span>
+                  <span className="text-[11px] font-bold tracking-widest text-amber-800 uppercase font-sans">
+                    {sermon.churchName || 'Comunidad de Fe'} · Serie: {sermon.series || 'Enseñanza'}
+                  </span>
+                </div>
                 <h1 className="text-2xl font-cinzel font-bold text-stone-900 mt-1 leading-snug">
                   {sermon.title}
                 </h1>
@@ -198,7 +203,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
               <div className="w-12 h-12 rounded-xl bg-white border border-stone-300 p-1 flex items-center justify-center shadow-xs shrink-0">
                 <img
-                  src="/assets/aistudio/rhema2_97cdc8b7.jpg"
+                  src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
                   alt="Rhema Logo"
                   className="w-full h-full object-contain"
                 />

@@ -6,7 +6,7 @@ import { PersonalReflectionsModal } from './components/PersonalReflectionsModal'
 import { PresentationMode } from './components/PresentationMode';
 import { ExportModal } from './components/ExportModal';
 import { SermonListModal } from './components/SermonListModal';
-import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection } from './types';
+import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection, SermonCategory } from './types';
 import {
   ChevronLeft,
   ChevronRight,
@@ -329,10 +329,32 @@ export default function App() {
     localStorage.setItem('rhema_active_sermon_id_v1', s.id);
   };
 
-  const handleNewSermon = () => {
-    const newS = createNewSermon(`Prédica — ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}`);
+  const handleNewSermon = (category: SermonCategory = 'Predicas Dominicales') => {
+    const categoryTitles: Record<SermonCategory, string> = {
+      'Predicas Dominicales': 'Prédica Dominical',
+      'Estudios Devocionales': 'Estudio Devocional',
+      'Células de estudio': 'Célula de Estudio',
+      'Mis prédicas': 'Mi Prédica',
+    };
+    const prefix = categoryTitles[category] || 'Prédica';
+    const newS = createNewSermon(
+      `${prefix} — ${new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric' })}`,
+      category
+    );
     setSermons(getAllSermons());
     setSermon(newS);
+  };
+
+  const handleUpdateSermonCategory = (sermonId: string, category: SermonCategory) => {
+    const target = sermons.find((s) => s.id === sermonId);
+    if (target) {
+      const updated = { ...target, category, updatedAt: Date.now() };
+      saveSermon(updated);
+      setSermons(getAllSermons());
+      if (sermon.id === sermonId) {
+        setSermon(updated);
+      }
+    }
   };
 
   const handleDeleteSermon = (id: string) => {
@@ -353,7 +375,7 @@ export default function App() {
         <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FBF9F5] dark:bg-[#0E1015] transition-opacity duration-500 ${isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
           <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 p-2 shadow-2xl animate-bounce flex items-center justify-center mb-4">
             <img
-              src="/assets/aistudio/rhema2_97cdc8b7.jpg"
+              src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
               alt="Rhema Logo"
               className="w-full h-full object-contain rounded-2xl"
             />
@@ -547,6 +569,7 @@ export default function App() {
         onNewSermon={handleNewSermon}
         onDeleteSermon={handleDeleteSermon}
         onImportSuccess={handleImportSuccess}
+        onUpdateSermonCategory={handleUpdateSermonCategory}
       />
     </div>
   );

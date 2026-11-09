@@ -1,4 +1,4 @@
-import { SermonNote, CardType } from '../types';
+import { SermonNote, CardType, SermonCategory } from '../types';
 import { INITIAL_SAMPLE_SERMON } from '../data/bibleData';
 
 const STORAGE_KEY = 'rhema_sermons_v1';
@@ -59,7 +59,13 @@ export function getAllSermons(): SermonNote[] {
       return initial;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : [INITIAL_SAMPLE_SERMON];
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((s) => ({
+        ...s,
+        category: s.category || 'Predicas Dominicales',
+      }));
+    }
+    return [INITIAL_SAMPLE_SERMON];
   } catch (error) {
     console.warn('Error loading sermons from localStorage, falling back to sample', error);
     return [INITIAL_SAMPLE_SERMON];
@@ -97,10 +103,14 @@ export function getActiveSermon(): SermonNote {
   return all[0] || INITIAL_SAMPLE_SERMON;
 }
 
-export function createNewSermon(title = 'Nueva Prédica'): SermonNote {
+export function createNewSermon(
+  title = 'Nueva Prédica',
+  category: SermonCategory = 'Predicas Dominicales'
+): SermonNote {
   const newSermon: SermonNote = {
     id: 'sermon-' + Date.now(),
     title,
+    category,
     preacher: 'Pastor ',
     churchName: 'Mi Iglesia',
     date: new Date().toISOString().split('T')[0],

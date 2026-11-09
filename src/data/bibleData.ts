@@ -387,6 +387,7 @@ export function getBibleVerses(bookId: string, chapter: number, translation = 'R
 export const INITIAL_SAMPLE_SERMON: SermonNote = {
   id: 'sermon-demo-1',
   title: 'Viviendo en la Gracia Inquebrantable',
+  category: 'Predicas Dominicales',
   preacher: 'Pastor David Morales',
   churchName: 'Comunidad de Fe y Gracia',
   date: new Date().toISOString().split('T')[0],

@@ -68,7 +68,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
       <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-[#151923] backdrop-blur-md">
         <div className="flex items-center gap-3">
           <img
-            src="/assets/aistudio/rhema2_97cdc8b7.jpg"
+            src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
             alt="Rhema Logo"
             className="w-8 h-8 rounded-lg object-contain bg-white border border-stone-700 p-0.5 shrink-0"
           />

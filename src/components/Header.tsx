@@ -12,7 +12,7 @@ import {
   PenLine,
   Check
 } from 'lucide-react';
-import { SermonNote } from '../types';
+import { SermonNote, SermonCategory, SERMON_CATEGORIES } from '../types';
 
 interface HeaderProps {
   sermon: SermonNote;
@@ -43,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [metaTitle, setMetaTitle] = useState(sermon.title);
+  const [metaCategory, setMetaCategory] = useState<SermonCategory>(sermon.category || 'Predicas Dominicales');
   const [metaPreacher, setMetaPreacher] = useState(sermon.preacher);
   const [metaScripture, setMetaScripture] = useState(sermon.mainScripture);
 
@@ -50,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
     if (e) e.preventDefault();
     onUpdateSermonMeta({
       title: metaTitle.trim() || 'Prédica sin título',
+      category: metaCategory,
       preacher: metaPreacher.trim() || 'Pastor',
       mainScripture: metaScripture.trim() || 'Cita Bíblica',
     });
@@ -64,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center gap-3 shrink-0">
           <div className="flex items-center gap-2.5">
             <img
-              src="/assets/aistudio/rhema2_97cdc8b7.jpg"
+              src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
               alt="Rhema Logo"
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs bg-white border border-stone-200/90 dark:border-stone-700/80 p-0.5 shrink-0"
             />
@@ -184,6 +186,17 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="bg-stone-100/70 dark:bg-stone-900/60 border-t border-stone-200/80 dark:border-stone-800/80 px-4 sm:px-6 py-2">
         {isEditingMeta ? (
           <form onSubmit={handleSaveMeta} className="flex flex-wrap items-center gap-2 text-xs">
+            <select
+              value={metaCategory}
+              onChange={(e) => setMetaCategory(e.target.value as SermonCategory)}
+              className="px-2.5 py-1 rounded border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-medium focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+            >
+              {SERMON_CATEGORIES.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
             <input
               type="text"
               value={metaTitle}
@@ -208,7 +221,7 @@ export const Header: React.FC<HeaderProps> = ({
             />
             <button
               type="submit"
-              className="px-2.5 py-1 bg-amber-700 text-white rounded hover:bg-amber-800 flex items-center gap-1"
+              className="px-2.5 py-1 bg-amber-700 text-white rounded hover:bg-amber-800 flex items-center gap-1 cursor-pointer font-medium"
             >
               <Check className="w-3 h-3" />
               <span>Guardar</span>
@@ -217,6 +230,29 @@ export const Header: React.FC<HeaderProps> = ({
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-stone-700 dark:text-stone-300">
+              {/* Category Quick Selector */}
+              {(() => {
+                const currentCat = SERMON_CATEGORIES.find(c => c.id === (sermon.category || 'Predicas Dominicales')) || SERMON_CATEGORIES[0];
+                return (
+                  <select
+                    value={sermon.category || 'Predicas Dominicales'}
+                    onChange={(e) => onUpdateSermonMeta({ category: e.target.value as SermonCategory })}
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border cursor-pointer ${currentCat.badgeBg} ${currentCat.badgeBorder} focus:outline-none`}
+                    title="Cambiar categoría de esta prédica"
+                  >
+                    {SERMON_CATEGORIES.map((c) => (
+                      <option
+                        key={c.id}
+                        value={c.id}
+                        className="bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100"
+                      >
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })()}
+
               <span className="font-serif font-bold text-sm text-stone-900 dark:text-stone-100">
                 {sermon.title}
               </span>
@@ -236,11 +272,12 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => {
                   setMetaTitle(sermon.title);
+                  setMetaCategory(sermon.category || 'Predicas Dominicales');
                   setMetaPreacher(sermon.preacher);
                   setMetaScripture(sermon.mainScripture);
                   setIsEditingMeta(true);
                 }}
-                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors p-1"
+                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 transition-colors p-1 cursor-pointer"
                 title="Editar datos de la prédica"
               >
                 <PenLine className="w-3 h-3" />
