@@ -1,5 +1,6 @@
 import type { BibleVerse, BibleBook } from '../types';
 import { BIBLE_BOOKS, BIBLE_TRANSLATIONS, getBibleVerses } from '../data/bibleData';
+import { getCuratedChapter } from '../data/curatedScriptures';
 
 type ApiTranslation = {
   id: string;
@@ -134,10 +135,68 @@ export async function getAvailableBibleTranslations(): Promise<BibleTranslationO
   ];
 }
 
-function readStoredChapter(key: string): BibleVerse[] | null {
+const VERSE_CACHE_VERSION = 'v5';
+const VERSE_CACHE_PREFIX = `rhema_verse_cache_${VERSE_CACHE_VERSION}_`;
+
+/**
+ * Actively purges legacy or corrupted cache entries from localStorage
+ */
+export function purgeLegacyVerseCache(): void {
+  if (typeof window === 'undefined') return;
   try {
-    const raw = window.localStorage.getItem(`rhema_verse_cache_${key}`);
-    return raw ? (JSON.parse(raw) as BibleVerse[]) : null;
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith('rhema_verse_cache_') && !k.startsWith(VERSE_CACHE_PREFIX)) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+  } catch (err) {
+    console.warn('Error purging legacy verse cache:', err);
+  }
+}
+
+// Auto-purge legacy caches on initial load
+if (typeof window !== 'undefined') {
+  try {
+    purgeLegacyVerseCache();
+  } catch {
+    // Ignore in SSR
+  }
+}
+
+/**
+ * Validates verse data to ensure no truncated words, cross-version leaks, or broken AST artifacts
+ */
+export function isValidVerseList(verses: BibleVerse[] | null, translation?: string): boolean {
+  if (!verses || !Array.isArray(verses) || verses.length === 0) return false;
+  for (const v of verses) {
+    if (!v || typeof v.text !== 'string' || !v.text.trim()) return false;
+    // Detect truncated phrase bug from older AST parser
+    if (v.text.includes('del  en Mizpa') || v.text.includes('presencia del  en')) return false;
+    // Detect fallback template text
+    if (v.text.startsWith('Versión ') && v.text.includes('capítulo')) return false;
+    // Guard against cross-version leakage in Jueces 20:1
+    if ((translation === 'NTV' || translation === 'NBLA') && v.bookId === 'jue' && v.chapter === 20 && v.verse === 1) {
+      if (v.text.includes('a Jehová en Mizpa')) return false;
+      if (!v.text.includes('Señor')) return false;
+    }
+  }
+  return true;
+}
+
+function readStoredChapter(key: string, translation?: string): BibleVerse[] | null {
+  try {
+    const fullKey = `${VERSE_CACHE_PREFIX}${key}`;
+    const raw = window.localStorage.getItem(fullKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BibleVerse[];
+    if (!isValidVerseList(parsed, translation)) {
+      window.localStorage.removeItem(fullKey);
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -145,7 +204,7 @@ function readStoredChapter(key: string): BibleVerse[] | null {
 
 function storeChapter(key: string, verses: BibleVerse[]): void {
   try {
-    window.localStorage.setItem(`rhema_verse_cache_${key}`, JSON.stringify(verses));
+    window.localStorage.setItem(`${VERSE_CACHE_PREFIX}${key}`, JSON.stringify(verses));
   } catch {
     // Continue with in-memory cache if storage full
   }
@@ -182,22 +241,42 @@ async function fetchChapterFromApiBible(
     const verses: BibleVerse[] = [];
     let currentVerseNum: number | null = null;
     let currentVerseText = '';
+    let currentSegments: { text: string; isJesus?: boolean }[] = [];
+    let currentFootnotes: { caller?: string; text: string }[] = [];
+    let currentCrossRefs: { ref: string; text?: string }[] = [];
 
     const flush = () => {
       if (currentVerseNum !== null && currentVerseText.trim()) {
+        const fullText = currentVerseText.replace(/\s+/g, ' ').trim();
+        const cleanedSegments = currentSegments.length > 0 ? currentSegments : undefined;
         verses.push({
           bookId,
           bookName: localBook.name,
           chapter,
           verse: currentVerseNum,
-          text: currentVerseText.replace(/\s+/g, ' ').trim(),
+          text: fullText,
+          segments: cleanedSegments && cleanedSegments.some((s) => s.isJesus) ? cleanedSegments : undefined,
+          footnotes: currentFootnotes.length > 0 ? currentFootnotes : undefined,
+          crossRefs: currentCrossRefs.length > 0 ? currentCrossRefs : undefined,
         });
         currentVerseNum = null;
         currentVerseText = '';
+        currentSegments = [];
+        currentFootnotes = [];
+        currentCrossRefs = [];
       }
     };
 
-    const walkNodes = (nodes: any[]) => {
+    const extractNoteText = (n: any): string => {
+      let t = '';
+      if (n.type === 'text' && typeof n.text === 'string') t += n.text;
+      if (Array.isArray(n.items)) {
+        for (const item of n.items) t += extractNoteText(item);
+      }
+      return t.trim();
+    };
+
+    const walkNodes = (nodes: any[], inJesus = false) => {
       for (const node of nodes) {
         if (node.name === 'verse' && node.attrs?.number) {
           flush();
@@ -205,19 +284,52 @@ async function fetchChapterFromApiBible(
           continue; // Avoid verse number label in items
         }
 
-        // Skip footnotes and translator references
-        if (node.name === 'note' || (node.name === 'char' && node.attrs?.style === 'f')) {
+        // Catch footnotes or cross references
+        if (node.name === 'note' || (node.name === 'char' && ['f', 'fe'].includes(node.attrs?.style))) {
+          const noteText = extractNoteText(node);
+          if (noteText && currentVerseNum !== null) {
+            currentFootnotes.push({ text: noteText, caller: node.attrs?.caller });
+          }
           continue;
         }
+
+        if (node.attrs?.style === 'x') {
+          const refText = extractNoteText(node);
+          if (refText && currentVerseNum !== null) {
+            currentCrossRefs.push({ ref: refText });
+          }
+          continue;
+        }
+
+        // Skip editorial headings
+        if (node.name === 'para' && ['s', 's1', 's2', 's3', 'r', 'd', 'ms', 'mr'].includes(node.attrs?.style)) {
+          continue;
+        }
+
+        // Add natural spacing when transitioning between paragraphs in poetry or prose
+        if (
+          node.name === 'para' &&
+          currentVerseNum !== null &&
+          currentVerseText.length > 0 &&
+          !/\s$/.test(currentVerseText)
+        ) {
+          currentVerseText += ' ';
+          if (currentSegments.length > 0 && !/\s$/.test(currentSegments[currentSegments.length - 1].text)) {
+            currentSegments[currentSegments.length - 1].text += ' ';
+          }
+        }
+
+        const isNowJesus = inJesus || (node.name === 'char' && node.attrs?.style === 'wj');
 
         if (node.type === 'text' && typeof node.text === 'string') {
           if (currentVerseNum !== null) {
             currentVerseText += node.text;
+            currentSegments.push({ text: node.text, isJesus: isNowJesus });
           }
         }
 
         if (Array.isArray(node.items)) {
-          walkNodes(node.items);
+          walkNodes(node.items, isNowJesus);
         }
       }
     };
@@ -235,90 +347,11 @@ async function fetchChapterFromApiBible(
 }
 
 /**
- * Curated verses tailored for NTV and NBLA for key chapters.
- */
-const CURATED_MODERN_VERSIONS: Record<string, Record<string, Record<number, { verse: number; text: string }[]>>> = {
-  NTV: {
-    rom: {
-      8: [
-        { verse: 1, text: "Por lo tanto, ya no hay condenación para los que pertenecen a Cristo Jesús;" },
-        { verse: 2, text: "y porque ustedes pertenecen a él, el poder del Espíritu que da vida los ha libertado del poder del pecado, que lleva a la muerte." },
-        { verse: 14, text: "Pues todos los que son guiados por el Espíritu de Dios son hijos de Dios." },
-        { verse: 15, text: "Y ustedes no han recibido un espíritu que los esclavice al miedo. En cambio, recibieron el Espíritu de Dios cuando él los adoptó como sus propios hijos. Ahora lo llamamos: «Abba, Padre»." },
-        { verse: 28, text: "Y sabemos que Dios hace que todas las cosas cooperen para el bien de quienes lo aman y son llamados según el propósito que él tiene para ellos." },
-        { verse: 31, text: "¿Qué podemos decir acerca de cosas tan maravillosas como estas? Si Dios está a favor de nosotros, ¿quién podrá ponerse en nuestra contra?" },
-        { verse: 37, text: "Claro que no, a pesar de todas estas cosas, nuestro triunfo es absoluto por medio de Cristo, quien nos amó." },
-        { verse: 38, text: "Y estoy convencido de que nada podrá jamás separarnos del amor de Dios. Ni la muerte, ni la vida, ni ángeles, ni demonios, ni nuestros temores de hoy, ni nuestras preocupaciones de mañana." },
-        { verse: 39, text: "Ningún poder en las alturas ni en las profundidades, de hecho, nada en toda la creación podrá jamás separarnos del amor de Dios, que está revelado en Cristo Jesús nuestro Señor." },
-      ],
-    },
-    sal: {
-      23: [
-        { verse: 1, text: "El Señor es mi pastor; tengo todo lo que necesito." },
-        { verse: 2, text: "En verdes praderas me hace descansar; me conduce junto a arroyos tranquilos." },
-        { verse: 3, text: "Él renueva mis fuerzas. Me guía por sendas correctas, y así da honra a su nombre." },
-        { verse: 4, text: "Aun cuando pase por el valle más oscuro, no temeré, porque tú estás a mi lado. Tu vara y tu cayado me protegen y me confortan." },
-        { verse: 5, text: "Me preparas un banquete en presencia de mis enemigos. Me honras ungiendo mi cabeza con aceite; mi copa se desborda de bendiciones." },
-        { verse: 6, text: "Ciertamente tu bondad y tu amor inagotable me seguirán todos los días de mi vida, y en la casa del Señor viviré por siempre." },
-      ],
-    },
-    fil: {
-      4: [
-        { verse: 4, text: "Alégrense siempre en el Señor. Insisto: ¡Alégrense!" },
-        { verse: 6, text: "No se preocupen por nada; en cambio, oren por todo. Díganle a Dios lo que necesitan y denle gracias por todo lo que él ha hecho." },
-        { verse: 7, text: "Así experimentarán la paz de Dios, que supera todo lo que podemos entender. La paz de Dios cuidará su corazón y su mente mientras vivan en Cristo Jesús." },
-        { verse: 13, text: "Pues todo lo puedo hacer por medio de Cristo, quien me da las fuerzas." },
-      ],
-    },
-    jua: {
-      15: [
-        { verse: 1, text: "Yo soy la vid verdadera, y mi Padre es el labrador." },
-        { verse: 4, text: "Permanezcan en mí, y yo permaneceré en ustedes. Pues una rama no puede dar fruto por sí misma; debe permanecer en la vid." },
-        { verse: 5, text: "Sí, yo soy la vid y ustedes son las ramas. Los que permanecen en mí y yo en ellos producirán mucho fruto porque, separados de mí, no pueden hacer nada." },
-        { verse: 12, text: "Este es mi mandamiento: Ámense unos a otros tal como yo los he amado." },
-      ],
-    },
-  },
-  NBLA: {
-    rom: {
-      8: [
-        { verse: 1, text: "Por tanto, no hay ahora condenación para los que están en Cristo Jesús, los que no andan conforme a la carne sino conforme al Espíritu." },
-        { verse: 2, text: "Porque la ley del Espíritu de vida en Cristo Jesús te ha libertado de la ley del pecado y de la muerte." },
-        { verse: 14, text: "Porque todos los que son guiados por el Espíritu de Dios, los tales son hijos de Dios." },
-        { verse: 15, text: "Pues no habéis recibido un espíritu de esclavitud para volver otra vez al temor, sino que habéis recibido un espíritu de adopción como hijos, por el cual clamamos: «¡Abba, Padre!»." },
-        { verse: 28, text: "Y sabemos que para los que aman a Dios, todas las cosas cooperan para bien, esto es, para los que son llamados conforme a Su propósito." },
-        { verse: 31, text: "Entonces, ¿qué diremos a esto? Si Dios está por nosotros, ¿quién estará contra nosotros?" },
-        { verse: 37, text: "Pero en todas estas cosas somos más que vencedores por medio de Aquel que nos amó." },
-        { verse: 38, text: "Porque estoy convencido de que ni la muerte, ni la vida, ni ángeles, ni principados, ni lo presente, ni lo por venir, ni los poderes," },
-        { verse: 39, text: "ni lo alto, ni lo profundo, ni ninguna otra cosa creada nos podrá separar del amor de Dios que es en Cristo Jesús Señor nuestro." },
-      ],
-    },
-    sal: {
-      23: [
-        { verse: 1, text: "El Señor es mi pastor, nada me faltará." },
-        { verse: 2, text: "En lugares de verdes pastos me hace descansar; junto a aguas de reposo me conduce." },
-        { verse: 3, text: "Él restaura mi alma; me guía por senderos de justicia por amor de Su nombre." },
-        { verse: 4, text: "Aunque pase por el valle de sombra de muerte, no temeré mal alguno, porque Tú estás conmigo; Tu vara y Tu cayado me infunden aliento." },
-        { verse: 5, text: "Tú preparas mesa delante de mí en presencia de mis enemigos; has ungido mi cabeza con aceite; mi copa está rebosando." },
-        { verse: 6, text: "Ciertamente el bien y la misericordia me seguirán todos los días de mi vida, y en la casa del Señor moraré por largos días." },
-      ],
-    },
-    fil: {
-      4: [
-        { verse: 4, text: "Regocijaos en el Señor siempre. Otra vez lo diré: ¡Regocijaos!" },
-        { verse: 6, text: "Por nada estéis afanosos; antes bien, en todo, mediante oración y súplica con acción de gracias, sean dadas a conocer vuestras peticiones delante de Dios." },
-        { verse: 7, text: "Y la paz de Dios, que sobrepasa todo entendimiento, guardará vuestros corazones y vuestras mentes en Cristo Jesús." },
-        { verse: 13, text: "Todo lo puedo en Cristo que me fortalece." },
-      ],
-    },
-  },
-};
-
-/**
  * Retrieves Bible verses for any book, chapter and translation.
+ * - Prioritizes verified curated chapter database (e.g. Jueces 20, Romanos 8, Salmos 23).
+ * - For NTV / NBLA: Queries API.Bible directly with AST parser preserving all character styles.
+ *   Never falls back to Reina-Valera to avoid cross-version contamination.
  * - For RVR1960: Fetches through Reina-Valera textual API + local verified passages.
- * - For NTV / NBLA: If API.Bible key is configured, queries API.Bible directly;
- *   otherwise serves curated chapter text, user pasted text, and clear version notices.
  */
 export async function getOrFetchChapterVerses(
   bookId: string,
@@ -329,41 +362,48 @@ export async function getOrFetchChapterVerses(
   const apiBookCode = LOCAL_TO_API_BOOK_MAP[bookId.toLowerCase()] || bookId.toUpperCase();
   const cacheKey = `${translation}_${apiBookCode}_${chapter}`;
 
-  // Check in-memory or localStorage cache first
-  const cached = chapterCache.get(cacheKey) ?? readStoredChapter(cacheKey);
-  if (cached && cached.length > 0) {
+  // 1. Check curated authentic passages first (instantaneous, offline-ready & immune to network issues)
+  const curated = getCuratedChapter(translation, bookId, chapter);
+  if (curated && curated.length > 0) {
+    const parsed: BibleVerse[] = curated.map((v) => ({
+      bookId,
+      bookName: localBook.name,
+      chapter,
+      verse: v.verse,
+      text: v.text,
+      segments: (v as any).segments || ((v as any).isJesus ? [{ text: v.text, isJesus: true }] : undefined),
+      crossRefs: (v as any).crossRefs,
+      footnotes: (v as any).footnotes,
+    }));
+    chapterCache.set(cacheKey, parsed);
+    storeChapter(cacheKey, parsed);
+    return parsed;
+  }
+
+  // 2. Check in-memory or validated localStorage cache
+  const cached = chapterCache.get(cacheKey) ?? readStoredChapter(cacheKey, translation);
+  if (cached && cached.length > 0 && isValidVerseList(cached, translation)) {
     chapterCache.set(cacheKey, cached);
     return cached;
   }
 
-  // 1. If NTV or NBLA, check if user provided API.Bible key
+  // 3. Modern versions path (NTV / NBLA): Fetch from API.Bible
   if (translation === 'NTV' || translation === 'NBLA') {
     const apiKey = getStoredApiBibleKey();
     if (apiKey) {
       const fromApiBible = await fetchChapterFromApiBible(translation, bookId, chapter, apiKey);
-      if (fromApiBible && fromApiBible.length > 0) {
+      if (fromApiBible && fromApiBible.length > 0 && isValidVerseList(fromApiBible, translation)) {
         chapterCache.set(cacheKey, fromApiBible);
         storeChapter(cacheKey, fromApiBible);
         return fromApiBible;
       }
     }
 
-    // Check curated modern verses for key sermon passages
-    const curatedForTranslation = CURATED_MODERN_VERSIONS[translation]?.[bookId.toLowerCase()]?.[chapter];
-    if (curatedForTranslation && curatedForTranslation.length > 0) {
-      const parsed: BibleVerse[] = curatedForTranslation.map((v) => ({
-        bookId,
-        bookName: localBook.name,
-        chapter,
-        verse: v.verse,
-        text: v.text,
-      }));
-      chapterCache.set(cacheKey, parsed);
-      return parsed;
-    }
+    // Return translation-specific fallback; NEVER leak spa_rvg into modern translations
+    return getBibleVerses(bookId, chapter, translation);
   }
 
-  // 2. Default RVR1960 path (or fallback for all books)
+  // 4. Reina-Valera (RVR1960) path
   const localVerses = getBibleVerses(bookId, chapter, translation);
   if (translation === 'RVR1960' && localVerses && localVerses.length >= 10) {
     return localVerses;
@@ -371,7 +411,7 @@ export async function getOrFetchChapterVerses(
 
   if (typeof window === 'undefined') return localVerses;
 
-  // Fetch complete chapter from Reina-Valera open editions (spa_rvg / spa_r09)
+  // Fetch complete chapter from Reina-Valera open editions (spa_rvg / spa_r09) strictly for RVR1960
   const candidateApiVersions = ['spa_rvg', 'spa_r09'];
   for (const apiVer of candidateApiVersions) {
     try {

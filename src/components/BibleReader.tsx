@@ -16,8 +16,19 @@ import {
   X,
   Loader2,
   Lightbulb,
+  SlidersHorizontal,
+  Info,
+  Type,
 } from 'lucide-react';
-import { BibleVerse, VerseHighlight, HighlightCategory, CardType } from '../types';
+import {
+  BibleVerse,
+  VerseHighlight,
+  HighlightCategory,
+  CardType,
+  ReaderSettings,
+  VerseCrossRef,
+  VerseFootnote,
+} from '../types';
 import {
   BIBLE_BOOKS,
   BIBLE_TRANSLATIONS,
@@ -26,6 +37,39 @@ import {
   saveCustomVerses,
 } from '../data/bibleData';
 import { getOrFetchChapterVerses } from '../services/bibleService';
+
+const DEFAULT_READER_SETTINGS: ReaderSettings = {
+  showJesusWordsInRed: true,
+  showCrossRefs: true,
+  showFootnotes: true,
+  fontSize: 'base',
+};
+
+const READER_SETTINGS_STORAGE = 'rhema_reader_settings';
+
+function getInitialReaderSettings(): ReaderSettings {
+  if (typeof window === 'undefined') return DEFAULT_READER_SETTINGS;
+  try {
+    const raw = localStorage.getItem(READER_SETTINGS_STORAGE);
+    return raw ? { ...DEFAULT_READER_SETTINGS, ...JSON.parse(raw) } : DEFAULT_READER_SETTINGS;
+  } catch {
+    return DEFAULT_READER_SETTINGS;
+  }
+}
+
+function persistReaderSettings(settings: ReaderSettings): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(READER_SETTINGS_STORAGE, JSON.stringify(settings));
+  } catch {}
+}
+
+const FONT_SIZE_CLASSES: Record<ReaderSettings['fontSize'], string> = {
+  sm: 'text-xs sm:text-sm leading-relaxed',
+  base: 'text-sm sm:text-base leading-relaxed',
+  lg: 'text-base sm:text-lg leading-relaxed',
+  xl: 'text-lg sm:text-xl leading-loose',
+};
 
 interface BibleReaderProps {
   activeBookId: string;
@@ -64,6 +108,10 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedHighlightId, setSelectedHighlightId] = useState<string | null>(null);
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [readerSettings, setReaderSettings] = useState<ReaderSettings>(getInitialReaderSettings);
+  const [activeCrossRefPopover, setActiveCrossRefPopover] = useState<{ verse: BibleVerse; ref: VerseCrossRef; x: number; y: number } | null>(null);
+  const [activeFootnotePopover, setActiveFootnotePopover] = useState<{ verse: BibleVerse; footnote: VerseFootnote; x: number; y: number } | null>(null);
   const [pastedText, setPastedText] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [verses, setVerses] = useState<BibleVerse[]>(() => getBibleVerses(activeBookId, activeChapter, currentTranslation));
@@ -452,12 +500,21 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
         <div className="flex items-center gap-1">
           <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer border border-stone-200/80 dark:border-stone-700 shadow-2xs"
+            title="Opciones de lectura: Letras rojas, referencias y notas"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span className="hidden sm:inline">Opciones</span>
+          </button>
+
+          <button
             onClick={() => setIsPasteModalOpen(true)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
             title="Pegar o personalizar versículos de cualquier versión"
           >
             <ClipboardPaste className="w-3.5 h-3.5 text-amber-600" />
-            <span className="hidden sm:inline">Pegar Pasaje</span>
+            <span className="hidden sm:inline">Pegar</span>
           </button>
 
           {onToggleCollapse && (
@@ -504,7 +561,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         onTouchEnd={() => {
           setTimeout(checkTextSelection, 120);
         }}
-        className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-3.5 font-serif text-stone-800 dark:text-stone-200 leading-relaxed text-sm sm:text-base relative"
+        className={`flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-3.5 font-serif text-stone-800 dark:text-stone-200 ${FONT_SIZE_CLASSES[readerSettings.fontSize]} relative`}
       >
         <div className="text-center pb-3 border-b border-stone-200/60 dark:border-stone-800/60">
           <h2 className="text-lg font-cinzel font-bold text-stone-900 dark:text-stone-100">
@@ -553,7 +610,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
                 <div className="flex-1">
                   <span className="verse-text-span select-text">
-                    {renderVerseContent(v.text, verseHighlights, (hl) => {
+                    {renderVerseContent(v, verseHighlights, readerSettings.showJesusWordsInRed, (hl) => {
                       setSelectedHighlightId(hl.id);
                       setActiveVerseForMenu(v);
                       setSelectedText(hl.selectedText);
@@ -563,6 +620,62 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                       });
                     })}
                   </span>
+
+                  {/* Badges de Citas Cruzadas */}
+                  {readerSettings.showCrossRefs && v.crossRefs && v.crossRefs.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      {v.crossRefs.map((cr, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setActiveCrossRefPopover({
+                              verse: v,
+                              ref: cr,
+                              x: Math.min(rect.left, window.innerWidth - 310),
+                              y: rect.bottom + 6,
+                            });
+                            setActiveFootnotePopover(null);
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-sans font-medium bg-amber-100/70 dark:bg-amber-950/40 text-amber-900 dark:text-amber-300 hover:bg-amber-200/80 dark:hover:bg-amber-900/60 border border-amber-300/60 dark:border-amber-800/60 transition-colors cursor-pointer shadow-2xs"
+                          title={`Ver cita conectada: ${cr.ref}`}
+                        >
+                          <Link2 className="w-2.5 h-2.5 text-amber-700 dark:text-amber-400" />
+                          <span>{cr.ref}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Badges de Notas de Traducción */}
+                  {readerSettings.showFootnotes && v.footnotes && v.footnotes.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                      {v.footnotes.map((fn, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setActiveFootnotePopover({
+                              verse: v,
+                              footnote: fn,
+                              x: Math.min(rect.left, window.innerWidth - 310),
+                              y: rect.bottom + 6,
+                            });
+                            setActiveCrossRefPopover(null);
+                          }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans text-stone-600 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+                          title="Ver nota aclaratoria de traducción"
+                        >
+                          <Info className="w-2.5 h-2.5 text-stone-500" />
+                          <span>Nota{fn.caller ? ` (${fn.caller})` : ''}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {hasHighlights && (
                     <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-1 border-t border-stone-200/40 dark:border-stone-800/40 text-[11px] font-sans">
@@ -763,11 +876,301 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Popover de Cita Cruzada */}
+      {activeCrossRefPopover && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setActiveCrossRefPopover(null)} />
+          <div
+            className="fixed z-50 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 rounded-xl shadow-2xl p-3.5 border border-stone-200 dark:border-stone-700 w-[290px] animate-in fade-in zoom-in-95 text-xs font-sans"
+            style={{
+              left: `${Math.max(12, Math.min(activeCrossRefPopover.x, window.innerWidth - 302))}px`,
+              top: `${Math.min(activeCrossRefPopover.y, window.innerHeight - 200)}px`,
+            }}
+          >
+            <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-stone-100 dark:border-stone-800">
+              <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-bold font-serif">
+                <Link2 className="w-3.5 h-3.5" />
+                <span>{activeCrossRefPopover.ref.ref}</span>
+              </div>
+              <button
+                onClick={() => setActiveCrossRefPopover(null)}
+                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {activeCrossRefPopover.ref.text ? (
+              <p className="text-stone-600 dark:text-stone-300 italic mb-3 font-serif text-[12px] leading-relaxed line-clamp-3">
+                "{activeCrossRefPopover.ref.text}"
+              </p>
+            ) : (
+              <p className="text-stone-500 dark:text-stone-400 mb-3 text-[11px]">
+                Pasaje bíblico relacionado con {activeCrossRefPopover.verse.bookName} {activeCrossRefPopover.verse.chapter}:{activeCrossRefPopover.verse.verse}.
+              </p>
+            )}
+
+            <div className="flex flex-col gap-1.5 pt-1 border-t border-stone-100 dark:border-stone-800">
+              <button
+                onClick={() => {
+                  const ref = activeCrossRefPopover.ref.ref;
+                  const quote = activeCrossRefPopover.ref.text || `Cita conectada a ${activeCrossRefPopover.verse.bookName} ${activeCrossRefPopover.verse.chapter}:${activeCrossRefPopover.verse.verse}`;
+                  const hlId = onAddHighlight({
+                    bookId: activeCrossRefPopover.verse.bookId,
+                    bookName: activeCrossRefPopover.verse.bookName,
+                    chapter: activeCrossRefPopover.verse.chapter,
+                    verse: activeCrossRefPopover.verse.verse,
+                    selectedText: ref,
+                    fullVerseText: activeCrossRefPopover.verse.text,
+                    category: 'revelation',
+                    color: '#EC4899',
+                  });
+                  onCreateLinkedCard(hlId, quote, ref, 'cross');
+                  setActiveCrossRefPopover(null);
+                }}
+                className="flex items-center justify-center gap-1.5 w-full py-1.5 px-2.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-medium text-[11px] transition-colors shadow-2xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Crear Tarjeta de Cita Cruzada</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Popover de Nota al Pie */}
+      {activeFootnotePopover && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setActiveFootnotePopover(null)} />
+          <div
+            className="fixed z-50 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 rounded-xl shadow-2xl p-3.5 border border-stone-200 dark:border-stone-700 w-[290px] animate-in fade-in zoom-in-95 text-xs font-sans"
+            style={{
+              left: `${Math.max(12, Math.min(activeFootnotePopover.x, window.innerWidth - 302))}px`,
+              top: `${Math.min(activeFootnotePopover.y, window.innerHeight - 180)}px`,
+            }}
+          >
+            <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-stone-100 dark:border-stone-800">
+              <div className="flex items-center gap-1.5 text-stone-800 dark:text-stone-200 font-bold">
+                <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                <span>Nota de Traducción</span>
+              </div>
+              <button
+                onClick={() => setActiveFootnotePopover(null)}
+                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-0.5 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <p className="text-stone-700 dark:text-stone-300 text-[12px] leading-relaxed mb-2.5 font-serif">
+              {activeFootnotePopover.footnote.text}
+            </p>
+
+            <div className="text-[10px] text-stone-400 flex items-center justify-between pt-1.5 border-t border-stone-100 dark:border-stone-800">
+              <span>{activeFootnotePopover.verse.bookName} {activeFootnotePopover.verse.chapter}:{activeFootnotePopover.verse.verse}</span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(activeFootnotePopover.footnote.text);
+                  setActiveFootnotePopover(null);
+                }}
+                className="text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer"
+              >
+                Copiar texto
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Modal de Opciones de Lectura */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {/* Cabecera */}
+            <div className="px-5 py-4 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-stone-50/70 dark:bg-stone-800/40">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-amber-700 dark:text-amber-400">
+                  <SlidersHorizontal className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-stone-900 dark:text-stone-100 text-sm">Opciones de Lectura</h3>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">Personaliza la visualización bíblica en Rhema</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-5 space-y-4">
+              {/* Opción: Palabras de Jesús en rojo */}
+              <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200/70 dark:border-stone-700/60">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-600 shrink-0" />
+                    <span className="text-xs font-semibold text-stone-900 dark:text-stone-100 font-sans">
+                      Palabras de Jesús en rojo
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">
+                    Destaca las citas directas de Cristo con un tono carmesí/coral distinguible.
+                  </p>
+                  <div className="mt-2 text-[11px] font-serif p-1.5 rounded bg-white dark:bg-stone-900 border border-stone-200/50 dark:border-stone-700/50">
+                    <span className={readerSettings.showJesusWordsInRed ? 'text-red-600 dark:text-red-400 font-medium' : 'text-stone-700 dark:text-stone-300'}>
+                      «Yo soy la vid verdadera, y mi Padre es el labrador.»
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...readerSettings, showJesusWordsInRed: !readerSettings.showJesusWordsInRed };
+                    setReaderSettings(updated);
+                    persistReaderSettings(updated);
+                  }}
+                  className={`w-11 h-6 shrink-0 rounded-full transition-colors relative cursor-pointer ${
+                    readerSettings.showJesusWordsInRed ? 'bg-amber-700' : 'bg-stone-300 dark:bg-stone-700'
+                  }`}
+                  aria-label="Alternar palabras de Jesús en rojo"
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-xs ${
+                      readerSettings.showJesusWordsInRed ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Opción: Referencias cruzadas */}
+              <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200/70 dark:border-stone-700/60">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span className="text-xs font-semibold text-stone-900 dark:text-stone-100 font-sans">
+                      Referencias cruzadas canónicas
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">
+                    Insignias discretas en versículos conectados teológicamente para explorar y añadir al lienzo.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...readerSettings, showCrossRefs: !readerSettings.showCrossRefs };
+                    setReaderSettings(updated);
+                    persistReaderSettings(updated);
+                  }}
+                  className={`w-11 h-6 shrink-0 rounded-full transition-colors relative cursor-pointer ${
+                    readerSettings.showCrossRefs ? 'bg-amber-700' : 'bg-stone-300 dark:bg-stone-700'
+                  }`}
+                  aria-label="Alternar referencias cruzadas"
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-xs ${
+                      readerSettings.showCrossRefs ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Opción: Notas de traducción */}
+              <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200/70 dark:border-stone-700/60">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-3.5 h-3.5 text-stone-500 shrink-0" />
+                    <span className="text-xs font-semibold text-stone-900 dark:text-stone-100 font-sans">
+                      Notas y comentarios lingüísticos
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">
+                    Aclaraciones de los traductores sobre términos hebreos, griegos o variantes textuales.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...readerSettings, showFootnotes: !readerSettings.showFootnotes };
+                    setReaderSettings(updated);
+                    persistReaderSettings(updated);
+                  }}
+                  className={`w-11 h-6 shrink-0 rounded-full transition-colors relative cursor-pointer ${
+                    readerSettings.showFootnotes ? 'bg-amber-700' : 'bg-stone-300 dark:bg-stone-700'
+                  }`}
+                  aria-label="Alternar notas de traducción"
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-xs ${
+                      readerSettings.showFootnotes ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Selector de tamaño de letra */}
+              <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200/70 dark:border-stone-700/60">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Type className="w-3.5 h-3.5 text-stone-600 dark:text-stone-400" />
+                    <span className="text-xs font-semibold text-stone-900 dark:text-stone-100 font-sans">
+                      Tamaño de texto bíblico
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-stone-500 uppercase px-1.5 py-0.5 rounded bg-stone-200 dark:bg-stone-700">
+                    {readerSettings.fontSize}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { id: 'sm', label: 'Pequeño', icon: 'A' },
+                    { id: 'base', label: 'Normal', icon: 'A' },
+                    { id: 'lg', label: 'Grande', icon: 'A+' },
+                    { id: 'xl', label: 'Máximo', icon: 'A++' },
+                  ].map((sz) => (
+                    <button
+                      key={sz.id}
+                      type="button"
+                      onClick={() => {
+                        const updated = { ...readerSettings, fontSize: sz.id as ReaderSettings['fontSize'] };
+                        setReaderSettings(updated);
+                        persistReaderSettings(updated);
+                      }}
+                      className={`py-2 px-1 rounded-lg border text-center transition-all cursor-pointer ${
+                        readerSettings.fontSize === sz.id
+                          ? 'bg-amber-700 text-white border-amber-800 font-bold shadow-2xs'
+                          : 'bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-700'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{sz.icon}</div>
+                      <div className="text-[10px] opacity-80">{sz.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Pie de modal */}
+            <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-800 bg-stone-50/70 dark:bg-stone-800/40 flex justify-end">
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="px-4 py-1.5 rounded-lg bg-amber-700 hover:bg-amber-800 text-white text-xs font-semibold cursor-pointer shadow-2xs"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-function renderVerseContent(
+function renderHighlightedString(
   text: string,
   highlights: VerseHighlight[],
   onHighlightClick: (hl: VerseHighlight) => void
@@ -849,3 +1252,43 @@ function renderVerseContent(
     </>
   );
 }
+
+function renderVerseContent(
+  verse: BibleVerse,
+  highlights: VerseHighlight[],
+  showJesusInRed: boolean,
+  onHighlightClick: (hl: VerseHighlight) => void
+) {
+  if (showJesusInRed && verse.segments && verse.segments.length > 0) {
+    return (
+      <>
+        {verse.segments.map((seg, sIdx) => {
+          const segHighlights = highlights.filter((hl) => {
+            const rawTarget = hl.selectedText?.trim().toLowerCase();
+            return rawTarget && seg.text.toLowerCase().includes(rawTarget);
+          });
+
+          const isRed = !!seg.isJesus;
+          const redClass = isRed ? 'text-red-600 dark:text-red-400 font-medium' : '';
+
+          if (segHighlights.length === 0) {
+            return (
+              <span key={sIdx} className={redClass}>
+                {seg.text}
+              </span>
+            );
+          }
+
+          return (
+            <span key={sIdx} className={redClass}>
+              {renderHighlightedString(seg.text, segHighlights, onHighlightClick)}
+            </span>
+          );
+        })}
+      </>
+    );
+  }
+
+  return renderHighlightedString(verse.text, highlights, onHighlightClick);
+}
+

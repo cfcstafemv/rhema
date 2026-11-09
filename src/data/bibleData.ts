@@ -1,4 +1,5 @@
 import { BibleBook, BibleVerse, SermonNote } from '../types';
+import { getCuratedChapter } from './curatedScriptures';
 
 export const BIBLE_BOOKS: BibleBook[] = [
   // Antiguo Testamento - Pentateuco
@@ -359,15 +360,33 @@ export function getBibleVerses(bookId: string, chapter: number, translation = 'R
     }));
   }
 
-  const dbBook = SCRIPTURE_DATABASE[bookId];
-  if (dbBook && dbBook[chapter]) {
-    return dbBook[chapter].map((v) => ({
+  // 1. Check curated authentic verses for this specific translation
+  const curated = getCuratedChapter(translation, bookId, chapter);
+  if (curated && curated.length > 0) {
+    return curated.map((v) => ({
       bookId,
       bookName: book.name,
       chapter,
       verse: v.verse,
       text: v.text,
+      segments: (v as any).segments || ((v as any).isJesus ? [{ text: v.text, isJesus: true }] : undefined),
+      crossRefs: (v as any).crossRefs,
+      footnotes: (v as any).footnotes,
     }));
+  }
+
+  // 2. If RVR1960, check scripture database
+  if (translation === 'RVR1960') {
+    const dbBook = SCRIPTURE_DATABASE[bookId];
+    if (dbBook && dbBook[chapter]) {
+      return dbBook[chapter].map((v) => ({
+        bookId,
+        bookName: book.name,
+        chapter,
+        verse: v.verse,
+        text: v.text,
+      }));
+    }
   }
 
   const fallbackText = `Versión ${translation} · ${book.name} capítulo ${chapter}. La Palabra de Dios es viva y eficaz, y nos enseña a vivir con fe, esperanza y obediencia.`;

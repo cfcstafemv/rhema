@@ -2,12 +2,37 @@ export type CardType = 'central' | 'point' | 'cross' | 'illustration' | 'action'
 
 export type HighlightCategory = 'central' | 'command' | 'promise' | 'reflection' | 'revelation';
 
+export interface VerseSegment {
+  text: string;
+  isJesus?: boolean;
+}
+
+export interface VerseCrossRef {
+  ref: string;
+  text?: string;
+}
+
+export interface VerseFootnote {
+  caller?: string;
+  text: string;
+}
+
+export interface ReaderSettings {
+  showJesusWordsInRed: boolean;
+  showCrossRefs: boolean;
+  showFootnotes: boolean;
+  fontSize: 'sm' | 'base' | 'lg' | 'xl';
+}
+
 export interface BibleVerse {
   bookId: string;
   bookName: string;
   chapter: number;
   verse: number;
   text: string;
+  segments?: VerseSegment[];
+  crossRefs?: VerseCrossRef[];
+  footnotes?: VerseFootnote[];
 }
 
 export interface VerseHighlight {
