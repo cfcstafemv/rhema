@@ -180,42 +180,51 @@ async function fetchChapterFromApiBible(
 
     // Parse verses from API.Bible JSON node tree
     const verses: BibleVerse[] = [];
+    let currentVerseNum: number | null = null;
+    let currentVerseText = '';
+
+    const flush = () => {
+      if (currentVerseNum !== null && currentVerseText.trim()) {
+        verses.push({
+          bookId,
+          bookName: localBook.name,
+          chapter,
+          verse: currentVerseNum,
+          text: currentVerseText.replace(/\s+/g, ' ').trim(),
+        });
+        currentVerseNum = null;
+        currentVerseText = '';
+      }
+    };
+
     const walkNodes = (nodes: any[]) => {
-      let currentVerseNum: number | null = null;
-      let currentVerseText = '';
-
-      const flush = () => {
-        if (currentVerseNum !== null && currentVerseText.trim()) {
-          verses.push({
-            bookId,
-            bookName: localBook.name,
-            chapter,
-            verse: currentVerseNum,
-            text: currentVerseText.trim(),
-          });
-          currentVerseNum = null;
-          currentVerseText = '';
-        }
-      };
-
       for (const node of nodes) {
         if (node.name === 'verse' && node.attrs?.number) {
           flush();
           currentVerseNum = parseInt(node.attrs.number, 10);
-        } else if (node.type === 'text' && typeof node.text === 'string') {
+          continue; // Avoid verse number label in items
+        }
+
+        // Skip footnotes and translator references
+        if (node.name === 'note' || (node.name === 'char' && node.attrs?.style === 'f')) {
+          continue;
+        }
+
+        if (node.type === 'text' && typeof node.text === 'string') {
           if (currentVerseNum !== null) {
             currentVerseText += node.text;
           }
         }
+
         if (Array.isArray(node.items)) {
           walkNodes(node.items);
         }
       }
-      flush();
     };
 
     if (res.data?.content) {
       walkNodes(res.data.content);
+      flush();
     }
 
     return verses.length > 0 ? verses : null;
