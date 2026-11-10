@@ -23,6 +23,7 @@ import {
   Wifi,
   CloudOff,
   RefreshCw,
+  Copy,
 } from 'lucide-react';
 import {
   BibleVerse,
@@ -120,6 +121,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const [readerSettings, setReaderSettings] = useState<ReaderSettings>(getInitialReaderSettings);
   const [activeCrossRefPopover, setActiveCrossRefPopover] = useState<{ verse: BibleVerse; ref: VerseCrossRef; x: number; y: number } | null>(null);
   const [activeFootnotePopover, setActiveFootnotePopover] = useState<{ verse: BibleVerse; footnote: VerseFootnote; x: number; y: number } | null>(null);
+  const [isFootnoteCopied, setIsFootnoteCopied] = useState(false);
   const [pastedText, setPastedText] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -754,9 +756,9 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                     </div>
                   )}
 
-                  {/* Badges de Notas de Traducción */}
+                  {/* Badges de Notas de Traducción y Lingüística */}
                   {readerSettings.showFootnotes && v.footnotes && v.footnotes.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {v.footnotes.map((fn, idx) => (
                         <button
                           key={idx}
@@ -767,15 +769,16 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                             setActiveFootnotePopover({
                               verse: v,
                               footnote: fn,
-                              x: Math.min(rect.left, window.innerWidth - 310),
+                              x: Math.min(rect.left, window.innerWidth - 330),
                               y: rect.bottom + 6,
                             });
                             setActiveCrossRefPopover(null);
+                            setIsFootnoteCopied(false);
                           }}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans text-stone-600 dark:text-stone-400 bg-stone-100 dark:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100 border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
-                          title="Ver nota aclaratoria de traducción"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-sans font-medium text-amber-900 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/60 border border-amber-300/80 dark:border-amber-800/80 transition-colors cursor-pointer shadow-2xs"
+                          title="Ver nota de traducción y lingüística"
                         >
-                          <Info className="w-2.5 h-2.5 text-stone-500" />
+                          <Info className="w-2.5 h-2.5 text-amber-700 dark:text-amber-400" />
                           <span>Nota{fn.caller ? ` (${fn.caller})` : ''}</span>
                         </button>
                       ))}
@@ -1045,43 +1048,59 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
       )}
 
       {/* Popover de Nota al Pie */}
+      {/* Popover de Notas de Traducción y Lingüística */}
       {activeFootnotePopover && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setActiveFootnotePopover(null)} />
           <div
-            className="fixed z-50 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 rounded-xl shadow-2xl p-3.5 border border-stone-200 dark:border-stone-700 w-[290px] animate-in fade-in zoom-in-95 text-xs font-sans"
+            className="fixed z-50 bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 rounded-2xl shadow-2xl p-4 border border-stone-200 dark:border-stone-700 w-[310px] sm:w-[350px] animate-in fade-in zoom-in-95 text-xs font-sans"
             style={{
-              left: `${Math.max(12, Math.min(activeFootnotePopover.x, window.innerWidth - 302))}px`,
-              top: `${Math.min(activeFootnotePopover.y, window.innerHeight - 180)}px`,
+              left: `${Math.max(12, Math.min(activeFootnotePopover.x, window.innerWidth - 360))}px`,
+              top: `${Math.min(activeFootnotePopover.y, window.innerHeight - 220)}px`,
             }}
           >
-            <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-stone-100 dark:border-stone-800">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-100 dark:border-stone-800">
               <div className="flex items-center gap-1.5 text-stone-800 dark:text-stone-200 font-bold">
-                <Info className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <span>Nota de Traducción</span>
+                <Info className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>Nota de Traducción y Lingüística</span>
               </div>
               <button
                 onClick={() => setActiveFootnotePopover(null)}
-                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-0.5 cursor-pointer"
+                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 p-0.5 cursor-pointer rounded"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <p className="text-stone-700 dark:text-stone-300 text-[12px] leading-relaxed mb-2.5 font-serif">
-              {activeFootnotePopover.footnote.text}
-            </p>
+            <div className="bg-stone-50 dark:bg-stone-800/60 p-2.5 rounded-xl border border-stone-200/60 dark:border-stone-700/60 mb-3">
+              <p className="text-stone-800 dark:text-stone-200 text-[12px] leading-relaxed font-serif">
+                {activeFootnotePopover.footnote.text}
+              </p>
+            </div>
 
-            <div className="text-[10px] text-stone-400 flex items-center justify-between pt-1.5 border-t border-stone-100 dark:border-stone-800">
-              <span>{activeFootnotePopover.verse.bookName} {activeFootnotePopover.verse.chapter}:{activeFootnotePopover.verse.verse}</span>
+            <div className="text-[11px] text-stone-400 flex items-center justify-between pt-1 border-t border-stone-100 dark:border-stone-800">
+              <span className="font-mono text-stone-500 dark:text-stone-400 font-medium">
+                {activeFootnotePopover.verse.bookName} {activeFootnotePopover.verse.chapter}:{activeFootnotePopover.verse.verse}
+              </span>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(activeFootnotePopover.footnote.text);
-                  setActiveFootnotePopover(null);
+                  setIsFootnoteCopied(true);
+                  setTimeout(() => setIsFootnoteCopied(false), 2000);
                 }}
-                className="text-amber-600 dark:text-amber-400 font-medium hover:underline cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/60 font-medium cursor-pointer border border-amber-200/60 dark:border-amber-800/60 transition-colors text-xs"
               >
-                Copiar texto
+                {isFootnoteCopied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">¡Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+                    <span>Copiar texto</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

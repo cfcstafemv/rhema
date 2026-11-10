@@ -242,7 +242,7 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
             ],
             "footnotes": [
                   {
-                        "text": "Algunos manuscritos añaden: los que no andan conforme a la carne, sino conforme al Espíritu."
+                        "text": "Variante manuscrita: Los manuscritos griegos más antiguos y confiables (Códice Sinaítico, Vaticano y Papiro 46) omiten «los que no andan conforme a la carne, sino conforme al Espíritu». El comité de traducción señala que esta cláusula fue incorporada en copias bizantinas posteriores por asimilación con el versículo 4."
                   }
             ]
       },
@@ -494,7 +494,12 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
                         "ref": "Juan 15:5",
                         "text": "Separados de mí nada podéis hacer."
                   }
-            ]
+            ],
+            "footnotes": [
+                  {
+                        "text": "Aclaración de término griego: «En Cristo que me fortalece» emplea el verbo compuesto ἐνδυναμόω (endynamoō, en voz pasiva-continua), que denota una capacitación dinámica interior constante derramada por Cristo en el creyente para sobrellevar toda circunstancia."
+                  }
+            ],
       },
       {
             "verse": 14,
@@ -554,6 +559,11 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
       {
             "verse": 2,
             "text": "Él corta de mí toda rama que no produce fruto y poda las ramas que sí dan fruto, para que den aún más.",
+            "footnotes": [
+                  {
+                        "text": "Aclaración lingüística griega: Existe un juego de palabras entre aírei (αἴρει, quitar/levantar) y kathaírei (καθαίρει, podar/limpiar). En la viticultura de Judea, los sarmientos caídos en tierra húmeda no se descartaban de inmediato, sino que el labrador los levantaba con cuidado, los lavaba del barro y los ataba a espalderas para que volvieran a recibir el sol y florecer."
+                  }
+            ],
             "isJesus": true
       },
       {
@@ -914,7 +924,7 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
             ],
             "footnotes": [
                   {
-                        "text": "Algunos manuscritos añaden: los que no andan conforme a la carne, sino conforme al Espíritu."
+                        "text": "Variante manuscrita: Los manuscritos griegos más antiguos y confiables (Códice Sinaítico, Vaticano y Papiro 46) omiten «los que no andan conforme a la carne, sino conforme al Espíritu». El comité de traducción señala que esta cláusula fue incorporada en copias bizantinas posteriores por asimilación con el versículo 4."
                   }
             ]
       },
@@ -1166,7 +1176,12 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
                         "ref": "Juan 15:5",
                         "text": "Separados de mí nada podéis hacer."
                   }
-            ]
+            ],
+            "footnotes": [
+                  {
+                        "text": "Aclaración de término griego: «En Cristo que me fortalece» emplea el verbo compuesto ἐνδυναμόω (endynamoō, en voz pasiva-continua), que denota una capacitación dinámica interior constante derramada por Cristo en el creyente para sobrellevar toda circunstancia."
+                  }
+            ],
       },
       {
             "verse": 14,
@@ -1226,6 +1241,11 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
       {
             "verse": 2,
             "text": "Todo sarmiento que en Mí no da fruto, lo quita; y todo el que da fruto, lo poda para que dé más fruto.",
+            "footnotes": [
+                  {
+                        "text": "Aclaración lingüística griega: Existe un juego de palabras entre aírei (αἴρει, quitar/levantar) y kathaírei (καθαίρει, podar/limpiar). En la viticultura de Judea, los sarmientos caídos en tierra húmeda no se descartaban de inmediato, sino que el labrador los levantaba con cuidado, los lavaba del barro y los ataba a espalderas para que volvieran a recibir el sol y florecer."
+                  }
+            ],
             "isJesus": true
       },
       {
@@ -1586,7 +1606,7 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
             ],
             "footnotes": [
                   {
-                        "text": "Algunos manuscritos añaden: los que no andan conforme a la carne, sino conforme al Espíritu."
+                        "text": "Variante manuscrita: Los manuscritos griegos más antiguos y confiables (Códice Sinaítico, Vaticano y Papiro 46) omiten «los que no andan conforme a la carne, sino conforme al Espíritu». El comité de traducción señala que esta cláusula fue incorporada en copias bizantinas posteriores por asimilación con el versículo 4."
                   }
             ]
       },
@@ -1838,7 +1858,12 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
                         "ref": "Juan 15:5",
                         "text": "Separados de mí nada podéis hacer."
                   }
-            ]
+            ],
+            "footnotes": [
+                  {
+                        "text": "Aclaración de término griego: «En Cristo que me fortalece» emplea el verbo compuesto ἐνδυναμόω (endynamoō, en voz pasiva-continua), que denota una capacitación dinámica interior constante derramada por Cristo en el creyente para sobrellevar toda circunstancia."
+                  }
+            ],
       },
       {
             "verse": 14,
@@ -1898,6 +1923,11 @@ export const CURATED_CHAPTERS: Record<string, Record<string, Record<number, Cura
       {
             "verse": 2,
             "text": "Todo pámpano que en mí no lleva fruto, lo quita; y todo aquel que lleva fruto, lo limpia, para que lleve más fruto.",
+            "footnotes": [
+                  {
+                        "text": "Aclaración lingüística griega: Existe un juego de palabras entre aírei (αἴρει, quitar/levantar) y kathaírei (καθαίρει, podar/limpiar). En la viticultura de Judea, los sarmientos caídos en tierra húmeda no se descartaban de inmediato, sino que el labrador los levantaba con cuidado, los lavaba del barro y los ataba a espalderas para que volvieran a recibir el sol y florecer."
+                  }
+            ],
             "isJesus": true
       },
       {
