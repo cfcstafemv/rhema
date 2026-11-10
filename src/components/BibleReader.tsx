@@ -19,6 +19,10 @@ import {
   SlidersHorizontal,
   Info,
   Type,
+  WifiOff,
+  Wifi,
+  CloudOff,
+  RefreshCw,
 } from 'lucide-react';
 import {
   BibleVerse,
@@ -36,7 +40,11 @@ import {
   getBibleVerses,
   saveCustomVerses,
 } from '../data/bibleData';
-import { getOrFetchChapterVerses } from '../services/bibleService';
+import {
+  getOrFetchChapterVerses,
+  isChapterAvailableOffline,
+  OfflineTranslationWaitingError,
+} from '../services/bibleService';
 
 const DEFAULT_READER_SETTINGS: ReaderSettings = {
   showJesusWordsInRed: true,
@@ -114,7 +122,15 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const [activeFootnotePopover, setActiveFootnotePopover] = useState<{ verse: BibleVerse; footnote: VerseFootnote; x: number; y: number } | null>(null);
   const [pastedText, setPastedText] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
-  const [verses, setVerses] = useState<BibleVerse[]>(() => getBibleVerses(activeBookId, activeChapter, currentTranslation));
+  const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
+  const [isWaitingForInternet, setIsWaitingForInternet] = useState(false);
+  const [verses, setVerses] = useState<BibleVerse[]>(() => {
+    const isAvail = isChapterAvailableOffline(activeBookId, activeChapter, currentTranslation);
+    if (!isAvail && (currentTranslation === 'NTV' || currentTranslation === 'NBLA') && typeof navigator !== 'undefined' && !navigator.onLine) {
+      return [];
+    }
+    return getBibleVerses(activeBookId, activeChapter, currentTranslation);
+  });
   const [isLoadingVerses, setIsLoadingVerses] = useState(false);
   const readerContainerRef = useRef<HTMLDivElement>(null);
 
@@ -122,16 +138,62 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const currentBook = BIBLE_BOOKS.find((b) => b.id === activeBookId) || BIBLE_BOOKS[0];
   const translationObj = translationOptions.find((t) => t.id === currentTranslation) || translationOptions[0];
 
+  // Listener para estado de conexión en tiempo real
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setRefreshKey((k) => k + 1);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
+    const isAvailableOffline = isChapterAvailableOffline(activeBookId, activeChapter, currentTranslation);
+
+    // Si es NTV o NBLA y no está en caché/offline y no hay internet, mostrar aviso de espera
+    if (currentTranslation === 'NTV' || currentTranslation === 'NBLA') {
+      if (!isAvailableOffline && typeof navigator !== 'undefined' && !navigator.onLine) {
+        setIsWaitingForInternet(true);
+        setIsLoadingVerses(false);
+        setVerses([]);
+        return;
+      }
+    }
+
     const immediate = getBibleVerses(activeBookId, activeChapter, currentTranslation);
-    setVerses(immediate);
+    if (isAvailableOffline || currentTranslation === 'RVR1960') {
+      setVerses(immediate);
+    }
 
     setIsLoadingVerses(true);
+    setIsWaitingForInternet(false);
+
     getOrFetchChapterVerses(activeBookId, activeChapter, currentTranslation)
       .then((fullVerses) => {
         if (isMounted && fullVerses && fullVerses.length > 0) {
           setVerses(fullVerses);
+          setIsWaitingForInternet(false);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          if (err instanceof OfflineTranslationWaitingError || err?.name === 'OfflineTranslationWaitingError') {
+            setIsWaitingForInternet(true);
+            setVerses([]);
+          } else if ((currentTranslation === 'NTV' || currentTranslation === 'NBLA') && !isAvailableOffline) {
+            setIsWaitingForInternet(true);
+            setVerses([]);
+          }
         }
       })
       .finally(() => {
@@ -571,6 +633,49 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             {translationObj.name} · {currentBook.category}
           </span>
         </div>
+
+        {verses.length === 0 && (
+          <div className="py-12 px-4 text-center font-sans max-w-md mx-auto">
+            {isWaitingForInternet ? (
+              <div className="bg-stone-50 dark:bg-stone-900/60 border border-stone-200 dark:border-stone-800 rounded-2xl p-6 shadow-sm flex flex-col items-center">
+                <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3">
+                  <WifiOff className="w-6 h-6 animate-pulse" />
+                </div>
+                <h3 className="text-base font-bold text-stone-900 dark:text-stone-100 mb-1">
+                  Esperando conexión a internet
+                </h3>
+                <p className="text-xs text-stone-600 dark:text-stone-400 leading-relaxed mb-4">
+                  El capítulo <strong>{currentBook.name} {activeChapter}</strong> en la versión <strong>{translationObj.name} ({translationObj.shortName})</strong> requiere internet para descargarse. Se cargará automáticamente al restablecerse la conexión.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-2 w-full justify-center">
+                  <button
+                    onClick={() => onSelectTranslation('RVR1960')}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-medium text-xs shadow-xs transition-colors cursor-pointer"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    <span>Leer en Reina-Valera 1960</span>
+                  </button>
+                  <button
+                    onClick={() => setRefreshKey((k) => k + 1)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 font-medium text-xs transition-colors cursor-pointer border border-stone-200 dark:border-stone-700"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingVerses ? 'animate-spin' : ''}`} />
+                    <span>Reintentar</span>
+                  </button>
+                </div>
+              </div>
+            ) : isLoadingVerses ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-3 text-stone-500 dark:text-stone-400">
+                <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+                <span className="text-xs font-medium">Cargando texto bíblico...</span>
+              </div>
+            ) : (
+              <div className="py-10 text-stone-400 text-xs">
+                No se encontraron versículos para este capítulo.
+              </div>
+            )}
+          </div>
+        )}
 
         {verses.map((v) => {
           const verseHighlights = getHighlightsForVerse(v.verse);

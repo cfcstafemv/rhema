@@ -243,14 +243,115 @@ const SCRIPTURE_DATABASE: Record<string, Record<number, { verse: number; text: s
   },
   jua: {
     15: [
-      { verse: 1, text: "Yo soy la vid verdadera, y mi Padre es el labrador." },
-      { verse: 2, text: "Todo pámpano que en mí no lleva fruto, lo quitará; y todo aquel que lleva fruto, lo limpiará, para que lleve más fruto." },
-      { verse: 4, text: "Permaneced en mí, y yo en vosotros. Como el pámpano no puede llevar fruto por sí mismo, si no permanece en la vid, así tampoco vosotros, si no permanecéis en mí." },
-      { verse: 5, text: "Yo soy la vid, vosotros los pámpanos; el que permanece en mí, y yo en él, éste lleva mucho fruto; porque separados de mí nada podéis hacer." },
-      { verse: 7, text: "Si permanecéis en mí, y mis palabras permanecen en vosotros, pedid todo lo que queréis, y os será hecho." },
-      { verse: 11, text: "Estas cosas os he hablado, para que mi gozo esté en vosotros, y vuestro gozo sea cumplido." },
-      { verse: 12, text: "Este es mi mandamiento: Que os améis unos a otros, como yo os he amado." }
-    ],
+      {
+            "verse": 1,
+            "text": "Yo soy la vid verdadera, y mi Padre es el labrador."
+      },
+      {
+            "verse": 2,
+            "text": "Todo pámpano que en mí no lleva fruto, lo quita; y todo aquel que lleva fruto, lo limpia, para que lleve más fruto."
+      },
+      {
+            "verse": 3,
+            "text": "Ya vosotros sois limpios por la palabra que os he hablado."
+      },
+      {
+            "verse": 4,
+            "text": "Permaneced en mí, y yo en vosotros. Como el pámpano no puede llevar fruto de sí mismo, si no permanece en la vid, así tampoco vosotros, si no permanecéis en mí."
+      },
+      {
+            "verse": 5,
+            "text": "Yo soy la vid, vosotros sois los pámpanos; el que permanece en mí, y yo en él, este lleva mucho fruto; porque sin mí nada podéis hacer."
+      },
+      {
+            "verse": 6,
+            "text": "Si alguno no permanece en mí, será echado fuera como pámpano, y se secará; y los recogen, ylos echan en el fuego, y arden."
+      },
+      {
+            "verse": 7,
+            "text": "Si permanecéis en mí, y mis palabras permanecen en vosotros, pediréis todo lo que quisiereis, y os será hecho."
+      },
+      {
+            "verse": 8,
+            "text": "En esto es glorificado mi Padre, en que llevéis mucho fruto, y seáis así mis discípulos."
+      },
+      {
+            "verse": 9,
+            "text": "Como el Padre me ha amado, así también yo os he amado; permaneced en mi amor."
+      },
+      {
+            "verse": 10,
+            "text": "Si guardáis mis mandamientos, permaneceréis en mi amor; como también yo he guardado los mandamientos de mi Padre, y permanezco en su amor."
+      },
+      {
+            "verse": 11,
+            "text": "Estas cosas os he hablado, para que mi gozo esté en vosotros, y vuestro gozo sea cumplido."
+      },
+      {
+            "verse": 12,
+            "text": "Este es mi mandamiento: Que os améis unos a otros, como yo os he amado."
+      },
+      {
+            "verse": 13,
+            "text": "Nadie tiene mayor amor que este, que uno ponga su vida por sus amigos."
+      },
+      {
+            "verse": 14,
+            "text": "Vosotros sois mis amigos, si hacéis lo que yo os mando."
+      },
+      {
+            "verse": 15,
+            "text": "Ya no os llamaré siervos, porque el siervo no sabe lo que hace su señor; mas os he llamado amigos, porque os he dado a conocer todas las cosas que he oído de mi Padre."
+      },
+      {
+            "verse": 16,
+            "text": "No me elegisteis vosotros a mí; sino que yo os elegí a vosotros; y os he puesto para que vayáis y llevéis fruto, y vuestro fruto permanezca; para que todo lo que pidiereis al Padre en mi nombre; Él os lo dé."
+      },
+      {
+            "verse": 17,
+            "text": "Esto os mando: Que os améis unos a otros."
+      },
+      {
+            "verse": 18,
+            "text": "Si el mundo os aborrece, sabed que a mí me aborreció antes que a vosotros."
+      },
+      {
+            "verse": 19,
+            "text": "Si fuerais del mundo, el mundo amaría lo suyo; mas porque no sois del mundo, antes yo os elegí del mundo, por eso el mundo os aborrece."
+      },
+      {
+            "verse": 20,
+            "text": "Acordaos de la palabra que yo os dije: El siervo no es más que su señor. Si a mí me han perseguido, también a vosotros perseguirán; si han guardado mi palabra, también guardarán la vuestra."
+      },
+      {
+            "verse": 21,
+            "text": "Pero todo esto os harán por causa de mi nombre; porque no conocen al que me envió."
+      },
+      {
+            "verse": 22,
+            "text": "Si yo no hubiera venido, ni les hubiera hablado, no tendrían pecado, pero ahora no tienen excusa de su pecado."
+      },
+      {
+            "verse": 23,
+            "text": "El que me aborrece, también a mi Padre aborrece."
+      },
+      {
+            "verse": 24,
+            "text": "Si yo no hubiese hecho entre ellos obras que ningún otro ha hecho, no tendrían pecado; pero ahora también ellos las han visto, y nos han aborrecido a mí y a mi Padre."
+      },
+      {
+            "verse": 25,
+            "text": "Peroesto es para que se cumpla la palabra que está escrita en su ley: Sin causa me aborrecieron."
+      },
+      {
+            "verse": 26,
+            "text": "Pero cuando venga el Consolador, a quien yo os enviaré del Padre, el Espíritu de verdad que procede del Padre, Él dará testimonio de mí."
+      },
+      {
+            "verse": 27,
+            "text": "Y vosotros también daréis testimonio, porque habéis estado conmigo desde el principio."
+      }
+],
     3: [
       { verse: 16, text: "Porque de tal manera amó Dios al mundo, que ha dado a su Hijo unigénito, para que todo aquel que en él cree, no se pierda, mas tenga vida eterna." },
       { verse: 17, text: "Porque no envió Dios a su Hijo al mundo para condenar al mundo, sino para que el mundo sea salvo por él." },

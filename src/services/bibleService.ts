@@ -135,7 +135,7 @@ export async function getAvailableBibleTranslations(): Promise<BibleTranslationO
   ];
 }
 
-const VERSE_CACHE_VERSION = 'v5';
+const VERSE_CACHE_VERSION = 'v6';
 const VERSE_CACHE_PREFIX = `rhema_verse_cache_${VERSE_CACHE_VERSION}_`;
 
 /**
@@ -167,7 +167,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Validates verse data to ensure no truncated words, cross-version leaks, or broken AST artifacts
+ * Validates verse data to ensure no truncated words, cross-version leaks, or incomplete chapter fragments
  */
 export function isValidVerseList(verses: BibleVerse[] | null, translation?: string): boolean {
   if (!verses || !Array.isArray(verses) || verses.length === 0) return false;
@@ -183,6 +183,14 @@ export function isValidVerseList(verses: BibleVerse[] | null, translation?: stri
       if (!v.text.includes('Señor')) return false;
     }
   }
+
+  // Reject incomplete chapter fragments with big non-sequential gaps (e.g. verse 1 jumping to 4, 5 to 12)
+  for (let i = 1; i < verses.length; i++) {
+    if (verses[i].verse - verses[i - 1].verse > 2) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -346,12 +354,77 @@ async function fetchChapterFromApiBible(
   }
 }
 
+export class OfflineTranslationWaitingError extends Error {
+  translation: string;
+  bookId: string;
+  chapter: number;
+
+  constructor(translation: string, bookId: string, chapter: number) {
+    super(`Esperando conexión a internet para cargar ${translation}`);
+    this.name = 'OfflineTranslationWaitingError';
+    this.translation = translation;
+    this.bookId = bookId;
+    this.chapter = chapter;
+  }
+}
+
+/**
+ * Checks whether a specific chapter of a translation is available without internet
+ */
+export function isChapterAvailableOffline(
+  bookId: string,
+  chapter: number,
+  translation: string
+): boolean {
+  const apiBookCode = LOCAL_TO_API_BOOK_MAP[bookId.toLowerCase()] || bookId.toUpperCase();
+  const cacheKey = `${translation}_${apiBookCode}_${chapter}`;
+
+  // 1. In-memory cache
+  if (chapterCache.has(cacheKey)) return true;
+
+  // 2. LocalStorage cache
+  const stored = readStoredChapter(cacheKey, translation);
+  if (stored && stored.length > 0) return true;
+
+  // 3. Curated passages
+  const curated = getCuratedChapter(translation, bookId, chapter);
+  if (curated && curated.length > 0) return true;
+
+  // 4. RVR1960 is always backed by the offline Scripture database
+  if (translation === 'RVR1960') return true;
+
+  return false;
+}
+
+function enrichWithCuratedData(
+  verses: BibleVerse[],
+  bookId: string,
+  chapter: number,
+  translation: string
+): BibleVerse[] {
+  const curated = getCuratedChapter(translation, bookId, chapter);
+  if (!curated || curated.length === 0) return verses;
+
+  const map = new Map<number, (typeof curated)[0]>();
+  for (const c of curated) map.set(c.verse, c);
+
+  return verses.map((v) => {
+    const c = map.get(v.verse);
+    if (!c) return v;
+    return {
+      ...v,
+      crossRefs: c.crossRefs || v.crossRefs,
+      footnotes: c.footnotes || v.footnotes,
+      segments: v.segments || (c.isJesus ? [{ text: v.text, isJesus: true }] : undefined),
+    };
+  });
+}
+
 /**
  * Retrieves Bible verses for any book, chapter and translation.
- * - Prioritizes verified curated chapter database (e.g. Jueces 20, Romanos 8, Salmos 23).
- * - For NTV / NBLA: Queries API.Bible directly with AST parser preserving all character styles.
- *   Never falls back to Reina-Valera to avoid cross-version contamination.
- * - For RVR1960: Fetches through Reina-Valera textual API + local verified passages.
+ * - Prioritizes verified curated chapter database (e.g. Jueces 20, Romanos 8, Salmos 23, Juan 15).
+ * - For NTV / NBLA: Fetches from API.Bible while online. If offline and uncached, throws OfflineTranslationWaitingError.
+ * - For RVR1960: Fetches through online textual API while online; seamlessly falls back to offline database when offline.
  */
 export async function getOrFetchChapterVerses(
   bookId: string,
@@ -375,9 +448,11 @@ export async function getOrFetchChapterVerses(
       crossRefs: (v as any).crossRefs,
       footnotes: (v as any).footnotes,
     }));
-    chapterCache.set(cacheKey, parsed);
-    storeChapter(cacheKey, parsed);
-    return parsed;
+    if (isValidVerseList(parsed, translation)) {
+      chapterCache.set(cacheKey, parsed);
+      storeChapter(cacheKey, parsed);
+      return parsed;
+    }
   }
 
   // 2. Check in-memory or validated localStorage cache
@@ -387,59 +462,68 @@ export async function getOrFetchChapterVerses(
     return cached;
   }
 
-  // 3. Modern versions path (NTV / NBLA): Fetch from API.Bible
+  const isOnline = typeof navigator === 'undefined' ? true : navigator.onLine;
+
+  // 3. Modern versions path (NTV / NBLA): Fetch from API.Bible when online
   if (translation === 'NTV' || translation === 'NBLA') {
+    if (!isOnline) {
+      throw new OfflineTranslationWaitingError(translation, bookId, chapter);
+    }
+
     const apiKey = getStoredApiBibleKey();
     if (apiKey) {
-      const fromApiBible = await fetchChapterFromApiBible(translation, bookId, chapter, apiKey);
-      if (fromApiBible && fromApiBible.length > 0 && isValidVerseList(fromApiBible, translation)) {
-        chapterCache.set(cacheKey, fromApiBible);
-        storeChapter(cacheKey, fromApiBible);
-        return fromApiBible;
+      try {
+        const fromApiBible = await fetchChapterFromApiBible(translation, bookId, chapter, apiKey);
+        if (fromApiBible && fromApiBible.length > 0 && isValidVerseList(fromApiBible, translation)) {
+          const enriched = enrichWithCuratedData(fromApiBible, bookId, chapter, translation);
+          chapterCache.set(cacheKey, enriched);
+          storeChapter(cacheKey, enriched);
+          return enriched;
+        }
+      } catch {
+        // Fall through to waiting error
       }
     }
 
-    // Return translation-specific fallback; NEVER leak spa_rvg into modern translations
-    return getBibleVerses(bookId, chapter, translation);
+    // If API is unreachable or offline, signal waiting state
+    throw new OfflineTranslationWaitingError(translation, bookId, chapter);
   }
 
-  // 4. Reina-Valera (RVR1960) path
+  // 4. Reina-Valera (RVR1960) path:
+  // Mientras haya internet, se toma desde la API online
+  if (isOnline) {
+    const candidateApiVersions = ['spa_rvg', 'spa_r09'];
+    for (const apiVer of candidateApiVersions) {
+      try {
+        const url = `${API_BASE_HELLOAO}/${apiVer}/${apiBookCode}/${chapter}.simple.json`;
+        const response = await fetchJson<{ chapter?: { content?: Array<{ type?: string; number?: number; text?: string }> } }>(url);
+        const content = response.chapter?.content ?? [];
+        const verses: BibleVerse[] = content
+          .filter(
+            (entry): entry is { type: 'verse'; number: number; text: string } =>
+              entry.type === 'verse' && typeof entry.number === 'number' && typeof entry.text === 'string'
+          )
+          .map((entry) => ({
+            bookId,
+            bookName: localBook.name,
+            chapter,
+            verse: entry.number,
+            text: entry.text,
+          }));
+
+        if (verses.length > 0 && isValidVerseList(verses, translation)) {
+          const enriched = enrichWithCuratedData(verses, bookId, chapter, translation);
+          chapterCache.set(cacheKey, enriched);
+          storeChapter(cacheKey, enriched);
+          return enriched;
+        }
+      } catch {
+        // Continue to next candidate
+      }
+    }
+  }
+
+  // Si no hay internet o falla la API, se muestra la base de datos local fuera de línea
   const localVerses = getBibleVerses(bookId, chapter, translation);
-  if (translation === 'RVR1960' && localVerses && localVerses.length >= 10) {
-    return localVerses;
-  }
-
-  if (typeof window === 'undefined') return localVerses;
-
-  // Fetch complete chapter from Reina-Valera open editions (spa_rvg / spa_r09) strictly for RVR1960
-  const candidateApiVersions = ['spa_rvg', 'spa_r09'];
-  for (const apiVer of candidateApiVersions) {
-    try {
-      const url = `${API_BASE_HELLOAO}/${apiVer}/${apiBookCode}/${chapter}.simple.json`;
-      const response = await fetchJson<{ chapter?: { content?: Array<{ type?: string; number?: number; text?: string }> } }>(url);
-      const content = response.chapter?.content ?? [];
-      const verses: BibleVerse[] = content
-        .filter(
-          (entry): entry is { type: 'verse'; number: number; text: string } =>
-            entry.type === 'verse' && typeof entry.number === 'number' && typeof entry.text === 'string'
-        )
-        .map((entry) => ({
-          bookId,
-          bookName: localBook.name,
-          chapter,
-          verse: entry.number,
-          text: entry.text,
-        }));
-
-      if (verses.length > 0) {
-        chapterCache.set(cacheKey, verses);
-        storeChapter(cacheKey, verses);
-        return verses;
-      }
-    } catch {
-      // Continue to next candidate
-    }
-  }
-
   return localVerses;
 }
