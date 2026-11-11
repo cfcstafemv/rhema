@@ -168,7 +168,8 @@ export default function App() {
     highlightId: string,
     quote: string,
     verseRef: string,
-    cardType: CardType
+    cardType: CardType,
+    extra?: { imageUrl?: string; imageCaption?: string; title?: string }
   ) => {
     const typeInfo = CARD_TYPES.find((t) => t.id === cardType) || CARD_TYPES[0];
     const customLabels = getCustomCardTypeLabels();
@@ -180,8 +181,8 @@ export default function App() {
     const newCard: FloatingCard = {
       id: newCardId,
       type: cardType,
-      title: cardType === 'central' ? (customLabels.central || 'Verdad Central') : `Nota sobre ${verseRef}`,
-      content: `Reflexión inspirada en: "${quote}"`,
+      title: extra?.title || (cardType === 'central' ? (customLabels.central || 'Verdad Central') : `Nota sobre ${verseRef}`),
+      content: extra?.imageUrl ? (extra.imageCaption || `Contexto geográfico e histórico de ${verseRef}`) : `Reflexión inspirada en: "${quote}"`,
       color: typeInfo.color,
       x: posX,
       y: posY,
@@ -190,6 +191,8 @@ export default function App() {
       linkedHighlightId: highlightId,
       linkedVerseRef: verseRef,
       linkedQuote: quote,
+      imageUrl: extra?.imageUrl,
+      imageCaption: extra?.imageCaption,
       createdAt: Date.now(),
     };
 

@@ -135,7 +135,7 @@ export async function getAvailableBibleTranslations(): Promise<BibleTranslationO
   ];
 }
 
-const VERSE_CACHE_VERSION = 'v6';
+const VERSE_CACHE_VERSION = 'v7';
 const VERSE_CACHE_PREFIX = `rhema_verse_cache_${VERSE_CACHE_VERSION}_`;
 
 /**
@@ -415,6 +415,7 @@ function enrichWithCuratedData(
       ...v,
       crossRefs: c.crossRefs || v.crossRefs,
       footnotes: c.footnotes || v.footnotes,
+      maps: c.maps || v.maps,
       segments: v.segments || (c.isJesus ? [{ text: v.text, isJesus: true }] : undefined),
     };
   });
@@ -447,6 +448,7 @@ export async function getOrFetchChapterVerses(
       segments: (v as any).segments || ((v as any).isJesus ? [{ text: v.text, isJesus: true }] : undefined),
       crossRefs: (v as any).crossRefs,
       footnotes: (v as any).footnotes,
+      maps: (v as any).maps,
     }));
     if (isValidVerseList(parsed, translation)) {
       chapterCache.set(cacheKey, parsed);

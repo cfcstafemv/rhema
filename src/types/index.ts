@@ -17,10 +17,20 @@ export interface VerseFootnote {
   text: string;
 }
 
+export interface VerseMap {
+  title: string;
+  placesMentioned?: string[];
+  relevanceExplanation?: string;
+  description?: string;
+  imageUrl: string;
+  sourceName?: string;
+}
+
 export interface ReaderSettings {
   showJesusWordsInRed: boolean;
   showCrossRefs: boolean;
   showFootnotes: boolean;
+  showMaps: boolean;
   fontSize: 'sm' | 'base' | 'lg' | 'xl';
 }
 
@@ -33,6 +43,7 @@ export interface BibleVerse {
   segments?: VerseSegment[];
   crossRefs?: VerseCrossRef[];
   footnotes?: VerseFootnote[];
+  maps?: VerseMap[];
 }
 
 export interface VerseHighlight {
@@ -66,6 +77,8 @@ export interface FloatingCard {
   linkedVerseRef?: string;
   linkedQuote?: string;
   tags?: string[];
+  imageUrl?: string;
+  imageCaption?: string;
   createdAt: number;
 }
 

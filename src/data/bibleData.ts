@@ -473,6 +473,7 @@ export function getBibleVerses(bookId: string, chapter: number, translation = 'R
       segments: (v as any).segments || ((v as any).isJesus ? [{ text: v.text, isJesus: true }] : undefined),
       crossRefs: (v as any).crossRefs,
       footnotes: (v as any).footnotes,
+      maps: (v as any).maps,
     }));
   }
 

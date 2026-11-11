@@ -163,6 +163,24 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
                 {currentCard.title}
               </h2>
 
+              {/* Attached Map / Image in Presentation Mode */}
+              {currentCard.imageUrl && (
+                <div className="mb-6 rounded-xl overflow-hidden border border-stone-700 bg-black/60 shadow-lg max-h-96 flex flex-col items-center">
+                  <img
+                    src={currentCard.imageUrl}
+                    alt={currentCard.imageCaption || currentCard.title}
+                    className="max-h-80 w-auto object-contain cursor-zoom-in"
+                    onClick={() => window.open(currentCard.imageUrl, '_blank')}
+                    title="Haz clic para abrir en pantalla completa"
+                  />
+                  {currentCard.imageCaption && (
+                    <div className="w-full p-2 bg-stone-900/90 text-xs text-stone-300 font-sans text-center border-t border-stone-800">
+                      {currentCard.imageCaption}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Content */}
               <p className="text-stone-300 font-sans text-base lg:text-lg leading-relaxed whitespace-pre-line mb-8">
                 {currentCard.content}

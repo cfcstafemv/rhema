@@ -24,6 +24,9 @@ import {
   CloudOff,
   RefreshCw,
   Copy,
+  MapPin,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
 import {
   BibleVerse,
@@ -33,6 +36,7 @@ import {
   ReaderSettings,
   VerseCrossRef,
   VerseFootnote,
+  VerseMap,
 } from '../types';
 import {
   BIBLE_BOOKS,
@@ -51,6 +55,7 @@ const DEFAULT_READER_SETTINGS: ReaderSettings = {
   showJesusWordsInRed: true,
   showCrossRefs: true,
   showFootnotes: true,
+  showMaps: true,
   fontSize: 'base',
 };
 
@@ -87,7 +92,13 @@ interface BibleReaderProps {
   onSelectPassage: (bookId: string, chapter: number) => void;
   onAddHighlight: (highlight: Omit<VerseHighlight, 'id' | 'createdAt'>) => string;
   onRemoveHighlight: (highlightId: string) => void;
-  onCreateLinkedCard: (highlightId: string, quote: string, ref: string, cardType: CardType) => void;
+  onCreateLinkedCard: (
+    highlightId: string,
+    quote: string,
+    ref: string,
+    cardType: CardType,
+    extra?: { imageUrl?: string; imageCaption?: string; title?: string }
+  ) => void;
   highlightedVerseId?: number | null;
   currentTranslation: string;
   onSelectTranslation: (translationId: string) => void;
@@ -122,6 +133,8 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const [activeCrossRefPopover, setActiveCrossRefPopover] = useState<{ verse: BibleVerse; ref: VerseCrossRef; x: number; y: number } | null>(null);
   const [activeFootnotePopover, setActiveFootnotePopover] = useState<{ verse: BibleVerse; footnote: VerseFootnote; x: number; y: number } | null>(null);
   const [isFootnoteCopied, setIsFootnoteCopied] = useState(false);
+  const [activeMapModal, setActiveMapModal] = useState<{ verse: BibleVerse; map: VerseMap } | null>(null);
+  const [isMapCopied, setIsMapCopied] = useState(false);
   const [pastedText, setPastedText] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -785,6 +798,30 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                     </div>
                   )}
 
+                  {/* Badges de Mapas Históricos y Contexto Geográfico */}
+                  {readerSettings.showMaps && v.maps && v.maps.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                      {v.maps.map((m, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMapModal({ verse: v, map: m });
+                            setActiveCrossRefPopover(null);
+                            setActiveFootnotePopover(null);
+                            setIsMapCopied(false);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-sans font-medium text-emerald-900 dark:text-emerald-200 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-300/80 dark:border-emerald-800/80 transition-colors cursor-pointer shadow-2xs"
+                          title={`Ver mapa: ${m.title}`}
+                        >
+                          <MapPin className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>🗺️ Mapa: {m.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {hasHighlights && (
                     <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-1 border-t border-stone-200/40 dark:border-stone-800/40 text-[11px] font-sans">
                       {verseHighlights.map((hl) => (
@@ -1107,6 +1144,202 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         </>
       )}
 
+      {/* Modal de Visor de Mapa Histórico y Contextual */}
+      {activeMapModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Cabecera */}
+            <div className="px-5 py-3.5 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between bg-stone-50/80 dark:bg-stone-850">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/70 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-serif font-bold text-stone-900 dark:text-stone-100 text-sm">
+                    {activeMapModal.map.title}
+                  </h3>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                    Contexto geográfico e histórico · {activeMapModal.verse.bookName} {activeMapModal.verse.chapter}:{activeMapModal.verse.verse}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveMapModal(null)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-600 dark:hover:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+                title="Cerrar"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Contenedor desplazable con la imagen y explicación */}
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[calc(92vh-130px)]">
+              {/* Cita del versículo para contrastar directamente con la geografía */}
+              <div className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-amber-900 dark:text-amber-200 mb-1 font-sans">
+                  <span>Pasaje en {activeMapModal.verse.bookName} {activeMapModal.verse.chapter}:{activeMapModal.verse.verse}</span>
+                  <span className="text-[10px] opacity-75 font-mono">{currentTranslation}</span>
+                </div>
+                <p className="text-xs sm:text-[13px] italic font-serif text-stone-800 dark:text-stone-200 leading-relaxed">
+                  "{activeMapModal.verse.text}"
+                </p>
+              </div>
+
+              {/* Lugares específicos mencionados en este versículo */}
+              {activeMapModal.map.placesMentioned && activeMapModal.map.placesMentioned.length > 0 && (
+                <div>
+                  <div className="text-[11px] font-semibold text-stone-700 dark:text-stone-300 mb-1.5 flex items-center gap-1.5 font-sans">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>Lugares geográficos en este versículo:</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeMapModal.map.placesMentioned.map((place, pIdx) => (
+                      <span
+                        key={pIdx}
+                        className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300/70 dark:border-emerald-800/70"
+                      >
+                        📍 {place}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Relación Directa con el Texto Bíblico */}
+              {activeMapModal.map.relevanceExplanation && (
+                <div className="p-3.5 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-800/60 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 dark:text-emerald-300 font-sans">
+                    <span>📖 ¿Por qué este mapa ilustra este versículo?</span>
+                  </div>
+                  <p className="text-[12px] sm:text-[13px] leading-relaxed text-stone-800 dark:text-stone-200 font-serif">
+                    {activeMapModal.map.relevanceExplanation}
+                  </p>
+                </div>
+              )}
+
+              {/* Imagen del mapa */}
+              <div className="relative rounded-xl overflow-hidden border border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-950 shadow-inner flex flex-col items-center justify-center min-h-[220px]">
+                <img
+                  src={activeMapModal.map.imageUrl}
+                  alt={activeMapModal.map.title}
+                  loading="lazy"
+                  className="w-full h-auto max-h-[380px] object-contain transition-transform duration-200"
+                />
+                <div className="w-full py-1.5 px-3 bg-stone-900/80 backdrop-blur-xs flex items-center justify-between text-[11px] text-stone-300">
+                  <span className="truncate max-w-[320px]">{activeMapModal.map.title}</span>
+                  <a
+                    href={activeMapModal.map.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 text-[10px] font-medium"
+                  >
+                    <span>Ver tamaño completo</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              </div>
+
+              {/* Descripción cartográfica y procedencia */}
+              <div className="p-3 rounded-xl bg-stone-50 dark:bg-stone-800/50 border border-stone-200/70 dark:border-stone-700/60 space-y-1.5 text-xs">
+                {activeMapModal.map.description && (
+                  <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-relaxed font-sans">
+                    {activeMapModal.map.description}
+                  </p>
+                )}
+                <div className="pt-1.5 border-t border-stone-200/60 dark:border-stone-700/60 flex items-center justify-between text-[10px] text-stone-500 dark:text-stone-400 font-sans">
+                  <span>Fuente: {activeMapModal.map.sourceName}</span>
+                  <span className="text-emerald-700 dark:text-emerald-400 font-medium">Dominio Público / Licencia Abierta</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Acciones del pie */}
+            <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-800 bg-stone-50/70 dark:bg-stone-800/40 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {/* Botón Guardar / Descargar imagen */}
+                <a
+                  href={activeMapModal.map.imageUrl}
+                  download
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-medium cursor-pointer transition-colors shadow-2xs"
+                  title="Descargar o guardar imagen directamente en tu dispositivo"
+                >
+                  <Download className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
+                  <span>Guardar imagen</span>
+                </a>
+
+                {/* Botón Copiar Enlace */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(activeMapModal.map.imageUrl);
+                    setIsMapCopied(true);
+                    setTimeout(() => setIsMapCopied(false), 2000);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-medium cursor-pointer transition-colors shadow-2xs"
+                >
+                  {isMapCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold">¡Enlace copiado!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
+                      <span>Copiar enlace</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Botón Vincular al Lienzo */}
+              <button
+                type="button"
+                onClick={() => {
+                  const hlId = onAddHighlight({
+                    bookId: activeMapModal.verse.bookId,
+                    bookName: activeMapModal.verse.bookName,
+                    chapter: activeMapModal.verse.chapter,
+                    verse: activeMapModal.verse.verse,
+                    selectedText: `Mapa: ${activeMapModal.map.title}`,
+                    fullVerseText: activeMapModal.verse.text,
+                    category: 'revelation',
+                    color: '#10B981',
+                  });
+                  const cardNote = [
+                    activeMapModal.map.placesMentioned && activeMapModal.map.placesMentioned.length > 0
+                      ? `📍 Lugares en el texto: ${activeMapModal.map.placesMentioned.join(', ')}`
+                      : '',
+                    activeMapModal.map.relevanceExplanation || activeMapModal.map.description || '',
+                    `Fuente cartográfica: ${activeMapModal.map.sourceName}`,
+                  ]
+                    .filter(Boolean)
+                    .join('\n\n');
+
+                  onCreateLinkedCard(
+                    hlId,
+                    `🗺️ ${activeMapModal.map.title}\n\n${cardNote}`,
+                    `${activeMapModal.verse.bookName} ${activeMapModal.verse.chapter}:${activeMapModal.verse.verse}`,
+                    'illustration',
+                    {
+                      imageUrl: activeMapModal.map.imageUrl,
+                      imageCaption: activeMapModal.map.title,
+                      title: `Mapa: ${activeMapModal.map.title}`,
+                    }
+                  );
+                  setActiveMapModal(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold cursor-pointer shadow-xs transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Vincular al Lienzo</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Opciones de Lectura */}
       {isSettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in">
@@ -1231,6 +1464,39 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                   <span
                     className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-xs ${
                       readerSettings.showFootnotes ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Opción: Mapas y contexto geográfico */}
+              <div className="flex items-start justify-between gap-3 p-3 rounded-xl bg-stone-50 dark:bg-stone-800/40 border border-stone-200/70 dark:border-stone-700/60">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="text-xs font-semibold text-stone-900 dark:text-stone-100 font-sans">
+                      Mapas y contexto geográfico
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">
+                    Insignias en versículos históricos para explorar mapas en alta resolución de dominio público y vincularlos al lienzo.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...readerSettings, showMaps: !readerSettings.showMaps };
+                    setReaderSettings(updated);
+                    persistReaderSettings(updated);
+                  }}
+                  className={`w-11 h-6 shrink-0 rounded-full transition-colors relative cursor-pointer ${
+                    readerSettings.showMaps ? 'bg-emerald-700' : 'bg-stone-300 dark:bg-stone-700'
+                  }`}
+                  aria-label="Alternar mapas y contexto geográfico"
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-xs ${
+                      readerSettings.showMaps ? 'translate-x-5' : 'translate-x-0'
                     }`}
                   />
                 </button>

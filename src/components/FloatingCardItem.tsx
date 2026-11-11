@@ -179,6 +179,8 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
         left: `${card.x}px`,
         top: `${card.y}px`,
         width: `${card.width || 320}px`,
+        maxWidth: `${card.width || 320}px`,
+        boxSizing: 'border-box',
         zIndex: card.zIndex || 1,
         borderColor: `${card.color}40`,
       }}
@@ -190,10 +192,10 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
       />
 
       {/* Card Header (Drag handle & controls) */}
-      <div className="px-3 py-2 flex items-center justify-between gap-2 border-b border-stone-100 dark:border-stone-800/80 cursor-grab active:cursor-grabbing bg-stone-50/50 dark:bg-stone-800/30 rounded-t-xl">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-700 dark:text-stone-300">
+      <div className="px-2.5 py-1.5 flex items-center justify-between gap-1.5 border-b border-stone-100 dark:border-stone-800/80 cursor-grab active:cursor-grabbing bg-stone-50/50 dark:bg-stone-800/30 rounded-t-xl overflow-hidden">
+        <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
           <GripHorizontal className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-          {renderTypeIcon()}
+          <span className="shrink-0">{renderTypeIcon()}</span>
           <select
             value={card.type}
             onChange={(e) => {
@@ -203,7 +205,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
               }
               onUpdate(card.id, { type: e.target.value as CardType });
             }}
-            className="no-drag text-[11px] font-sans font-semibold bg-transparent border-0 text-stone-700 dark:text-stone-300 focus:ring-0 cursor-pointer"
+            className="no-drag text-[11px] font-sans font-semibold bg-transparent border-0 text-stone-700 dark:text-stone-300 focus:ring-0 cursor-pointer truncate max-w-[130px] sm:max-w-[145px] py-0 pl-0.5 pr-2"
           >
             {CARD_TYPES.map((t) => (
               <option key={t.id} value={t.id} className="bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200">
@@ -212,7 +214,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
             ))}
             {onOpenEditDefaults && (
               <option value="__edit_defaults__" className="bg-amber-50 dark:bg-amber-950 font-bold text-amber-800 dark:text-amber-300">
-                ✏️ Editar títulos predeterminados...
+                ✏️ Editar títulos...
               </option>
             )}
           </select>
@@ -224,7 +226,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
                 e.stopPropagation();
                 onOpenEditDefaults();
               }}
-              className="p-1 text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors no-drag cursor-pointer"
+              className="p-1 text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors no-drag shrink-0 cursor-pointer"
               title="Editar títulos predeterminados"
               aria-label="Editar títulos predeterminados"
             >
@@ -233,15 +235,15 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 shrink-0 ml-1">
           {/* Color palette toggle */}
           <div className="relative">
             <button
               onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
-              className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded transition-colors no-drag"
+              className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded transition-colors no-drag cursor-pointer"
               title="Cambiar color de tarjeta"
             >
-              <Palette className="w-3 h-3" />
+              <Palette className="w-3.5 h-3.5" />
             </button>
 
             {isColorPickerOpen && (
@@ -253,7 +255,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
                       onUpdate(card.id, { color: c });
                       setIsColorPickerOpen(false);
                     }}
-                    className="w-4 h-4 rounded-full transition-transform hover:scale-125"
+                    className="w-4 h-4 rounded-full transition-transform hover:scale-125 cursor-pointer"
                     style={{ backgroundColor: c }}
                   />
                 ))}
@@ -264,19 +266,19 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           {/* Minimize toggle */}
           <button
             onClick={() => onUpdate(card.id, { isMinimized: !card.isMinimized })}
-            className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded transition-colors no-drag"
+            className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded transition-colors no-drag cursor-pointer"
             title={card.isMinimized ? 'Expandir' : 'Minimizar'}
           >
-            {card.isMinimized ? <Maximize2 className="w-3 h-3" /> : <Minimize2 className="w-3 h-3" />}
+            {card.isMinimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
           </button>
 
           {/* Delete */}
           <button
             onClick={() => onDelete(card.id)}
-            className="p-1 text-stone-400 hover:text-rose-600 rounded transition-colors no-drag"
+            className="p-1 text-stone-400 hover:text-rose-600 rounded transition-colors no-drag cursor-pointer"
             title="Eliminar tarjeta"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -298,7 +300,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               placeholder="Título del punto o mensaje..."
-              className="flex-1 text-sm font-bold font-serif text-stone-900 dark:text-stone-100 bg-transparent border-b border-dashed border-stone-300 dark:border-stone-700 hover:border-amber-500 focus:border-solid focus:border-amber-600 focus:outline-hidden px-1 py-0.5 transition-colors no-drag select-text touch-auto"
+              className="flex-1 min-w-0 text-sm font-bold font-serif text-stone-900 dark:text-stone-100 bg-transparent border-b border-dashed border-stone-300 dark:border-stone-700 hover:border-amber-500 focus:border-solid focus:border-amber-600 focus:outline-hidden px-1 py-0.5 transition-colors no-drag select-text touch-auto"
               title="Haz clic o toca para editar el título"
             />
             <button
@@ -321,8 +323,27 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           onTouchStart={(e) => e.stopPropagation()}
           placeholder="Escribe las notas, argumentos del pastor, preguntas o citas..."
           rows={3}
-          className="w-full text-xs font-sans text-stone-700 dark:text-stone-300 bg-transparent resize-y border-0 focus:outline-hidden p-1 leading-relaxed placeholder:text-stone-400 no-drag select-text touch-auto"
+          className="w-full text-xs font-sans bg-transparent border-0 resize-none focus:outline-none text-stone-700 dark:text-stone-300 placeholder:text-stone-400/70 p-0 leading-relaxed"
         />
+
+        {/* Context Map / Image Preview if attached */}
+        {card.imageUrl && (
+          <div className="relative rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700 bg-stone-900/90 group/img my-1">
+            <img
+              src={card.imageUrl}
+              alt={card.imageCaption || card.title}
+              className="w-full max-h-44 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => window.open(card.imageUrl, '_blank')}
+              title="Haz clic para abrir el mapa en alta resolución"
+              loading="lazy"
+            />
+            {card.imageCaption && (
+              <div className="p-1.5 bg-black/75 text-[10px] text-white/90 backdrop-blur-xs font-sans line-clamp-2">
+                {card.imageCaption}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Linked Scripture Reference Ribbon */}
         {card.linkedVerseRef && (
