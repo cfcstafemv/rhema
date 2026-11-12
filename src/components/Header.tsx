@@ -12,6 +12,8 @@ import {
   PenLine,
   Check,
   Search,
+  Users,
+  Upload,
 } from 'lucide-react';
 import { SermonNote, SermonCategory, SERMON_CATEGORIES } from '../types';
 
@@ -25,6 +27,9 @@ interface HeaderProps {
   onOpenPresentationMode: () => void;
   onOpenExport: () => void;
   onOpenQuickSearch?: () => void;
+  isCellMode?: boolean;
+  onToggleCellMode?: () => void;
+  onOpenCellPdfUpload?: () => void;
   onUpdateSermonMeta: (updates: Partial<SermonNote>) => void;
   activeView: 'split' | 'canvas-only' | 'bible-only';
   onViewChange: (view: 'split' | 'canvas-only' | 'bible-only') => void;
@@ -40,6 +45,9 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenPresentationMode,
   onOpenExport,
   onOpenQuickSearch,
+  isCellMode,
+  onToggleCellMode,
+  onOpenCellPdfUpload,
   onUpdateSermonMeta,
   activeView,
   onViewChange,
@@ -116,10 +124,41 @@ export const Header: React.FC<HeaderProps> = ({
             <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
             <span>Modo Presentación</span>
           </button>
+
+          {onToggleCellMode && (
+            <button
+              onClick={onToggleCellMode}
+              className={`flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer px-2.5 py-1 rounded-lg ${
+                isCellMode
+                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700 shadow-2xs'
+                  : 'hover:text-emerald-700 dark:hover:text-emerald-400'
+              }`}
+              title={isCellMode ? 'Modo Célula activo (clic para volver a Biblia)' : 'Cambiar a Modo Célula (Lección PDF)'}
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Modo Célula</span>
+              {isCellMode && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              )}
+            </button>
+          )}
         </nav>
 
         {/* Zone 3: Primary Action & Quick Utilities */}
         <div className="flex items-center gap-2.5 shrink-0">
+          {/* Cargar Célula PDF button if in cell mode */}
+          {isCellMode && onOpenCellPdfUpload && (
+            <button
+              onClick={onOpenCellPdfUpload}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-xs transition-colors cursor-pointer font-semibold"
+              title="Cargar o cambiar el archivo PDF de la lección semanal de célula"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Cargar Célula (PDF)</span>
+              <span className="sm:hidden">Célula PDF</span>
+            </button>
+          )}
+
           {/* Quick Passage Search button */}
           {onOpenQuickSearch && (
             <button

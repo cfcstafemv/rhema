@@ -145,10 +145,22 @@ export const SERMON_CATEGORIES: SermonCategoryConfig[] = [
   },
 ];
 
+export interface CellLessonData {
+  fileName?: string;
+  lessonTitle: string;
+  fullText: string;
+  detectedScriptures: string[];
+  detectedQuestions: string[];
+  icebreaker?: string;
+  loadedAt: number;
+}
+
 export interface SermonNote {
   id: string;
   title: string;
   category?: SermonCategory;
+  studyMode?: 'sermon' | 'cell';
+  cellLesson?: CellLessonData;
   preacher: string;
   churchName: string;
   date: string;

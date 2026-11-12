@@ -7,6 +7,9 @@ import { PresentationMode } from './components/PresentationMode';
 import { ExportModal } from './components/ExportModal';
 import { SermonListModal } from './components/SermonListModal';
 import { QuickPassageSearchModal } from './components/QuickPassageSearchModal';
+import { CellLessonReader } from './components/CellLessonReader';
+import { CellPdfUploadModal } from './components/CellPdfUploadModal';
+import { ParsedCellLesson } from './services/pdfService';
 import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection, SermonCategory } from './types';
 import {
   ChevronLeft,
@@ -15,6 +18,7 @@ import {
   Layers,
   HeartHandshake,
   Maximize2,
+  Users,
 } from 'lucide-react';
 import {
   getActiveSermon,
@@ -40,6 +44,8 @@ export default function App() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSermonsListOpen, setIsSermonsListOpen] = useState(false);
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const [isCellPdfUploadOpen, setIsCellPdfUploadOpen] = useState(false);
+  const isCellMode = sermon.studyMode === 'cell' || sermon.category === 'Células de estudio';
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -326,6 +332,64 @@ export default function App() {
     setActiveView('split');
   };
 
+  const handleToggleCellMode = () => {
+    const nextMode = isCellMode ? 'sermon' : 'cell';
+    const nextCategory: SermonCategory =
+      nextMode === 'cell'
+        ? 'Células de estudio'
+        : sermon.category === 'Células de estudio'
+        ? 'Predicas Dominicales'
+        : sermon.category || 'Predicas Dominicales';
+
+    const updated: SermonNote = {
+      ...sermon,
+      studyMode: nextMode,
+      category: nextCategory,
+      updatedAt: Date.now(),
+    };
+    updateAndSaveSermon(updated);
+
+    if (nextMode === 'cell' && !sermon.cellLesson) {
+      setIsCellPdfUploadOpen(true);
+    }
+  };
+
+  const handleCellLessonLoaded = (parsed: ParsedCellLesson) => {
+    const updated: SermonNote = {
+      ...sermon,
+      title: parsed.lessonTitle,
+      category: 'Células de estudio',
+      studyMode: 'cell',
+      cellLesson: {
+        fileName: parsed.fileName,
+        lessonTitle: parsed.lessonTitle,
+        fullText: parsed.fullText,
+        detectedScriptures: parsed.detectedScriptures.map((s) => s.ref),
+        detectedQuestions: parsed.detectedQuestions,
+        icebreaker: parsed.icebreaker,
+        loadedAt: Date.now(),
+      },
+      cards: parsed.cards,
+      links: parsed.links,
+      activePassage:
+        parsed.detectedScriptures.length > 0 &&
+        parsed.detectedScriptures[0].bookId &&
+        parsed.detectedScriptures[0].chapter
+          ? {
+              bookId: parsed.detectedScriptures[0].bookId,
+              chapter: parsed.detectedScriptures[0].chapter,
+            }
+          : sermon.activePassage,
+      mainScripture:
+        parsed.detectedScriptures.length > 0
+          ? parsed.detectedScriptures.map((s) => s.ref).join(', ')
+          : sermon.mainScripture,
+      updatedAt: Date.now(),
+    };
+    updateAndSaveSermon(updated);
+    setActiveView('split');
+  };
+
   const handleNavigateToLinkedVerse = (verseRef: string) => {
     const match = verseRef.match(/^([\w\s]+)\s+(\d+):(\d+)$/);
     if (match) {
@@ -429,13 +493,16 @@ export default function App() {
         onOpenPresentationMode={() => setIsPresentationOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+        isCellMode={isCellMode}
+        onToggleCellMode={handleToggleCellMode}
+        onOpenCellPdfUpload={() => setIsCellPdfUploadOpen(true)}
         onUpdateSermonMeta={handleUpdateSermonMeta}
         activeView={activeView}
         onViewChange={setActiveView}
       />
 
       <main className="flex-1 flex overflow-hidden relative">
-        {/* Collapsible Bible Panel with Sliding Drawer Animation */}
+        {/* Collapsible Bible / Cell Lesson Panel with Sliding Drawer Animation */}
         {(activeView === 'split' || activeView === 'bible-only') && (
           <div
             className={`h-full transition-all duration-300 ease-in-out z-20 flex shrink-0 ${
@@ -447,20 +514,33 @@ export default function App() {
             }`}
           >
             <div className={`h-full w-full overflow-hidden transition-opacity duration-200 ${isBibleCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-              <BibleReader
-                activeBookId={sermon.activePassage.bookId}
-                activeChapter={sermon.activePassage.chapter}
-                highlights={sermon.highlights}
-                onSelectPassage={handleSelectPassage}
-                onAddHighlight={handleAddHighlight}
-                onRemoveHighlight={handleRemoveHighlight}
-                onCreateLinkedCard={handleCreateLinkedCard}
-                highlightedVerseId={highlightedVerseId}
-                currentTranslation={currentTranslation}
-                onSelectTranslation={setCurrentTranslation}
-                translations={availableTranslations}
-                onToggleCollapse={() => setIsBibleCollapsed(true)}
-              />
+              {isCellMode ? (
+                <CellLessonReader
+                  cellLesson={sermon.cellLesson}
+                  onOpenUploadModal={() => setIsCellPdfUploadOpen(true)}
+                  onSwitchToSermonMode={handleToggleCellMode}
+                  onSelectPassageInBible={(bookId, chapter) => {
+                    handleSelectPassage(bookId, chapter);
+                    handleToggleCellMode();
+                  }}
+                  cards={sermon.cards}
+                />
+              ) : (
+                <BibleReader
+                  activeBookId={sermon.activePassage.bookId}
+                  activeChapter={sermon.activePassage.chapter}
+                  highlights={sermon.highlights}
+                  onSelectPassage={handleSelectPassage}
+                  onAddHighlight={handleAddHighlight}
+                  onRemoveHighlight={handleRemoveHighlight}
+                  onCreateLinkedCard={handleCreateLinkedCard}
+                  highlightedVerseId={highlightedVerseId}
+                  currentTranslation={currentTranslation}
+                  onSelectTranslation={setCurrentTranslation}
+                  translations={availableTranslations}
+                  onToggleCollapse={() => setIsBibleCollapsed(true)}
+                />
+              )}
             </div>
           </div>
         )}
@@ -613,6 +693,12 @@ export default function App() {
         }}
         currentBookId={sermon.activePassage.bookId}
         currentChapter={sermon.activePassage.chapter}
+      />
+
+      <CellPdfUploadModal
+        isOpen={isCellPdfUploadOpen}
+        onClose={() => setIsCellPdfUploadOpen(false)}
+        onLessonLoaded={handleCellLessonLoaded}
       />
     </div>
   );
