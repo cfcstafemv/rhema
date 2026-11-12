@@ -848,40 +848,21 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         </div>
       </div>
 
-      <div className="px-3 py-1.5 bg-stone-100/90 dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 overflow-x-auto no-scrollbar z-10">
-        <div className="flex items-center gap-1 shrink-0">
-          <span className="text-xs text-stone-700 dark:text-stone-300 font-serif font-semibold">Cap:</span>
-          {/* Menú desplegable completo para saltar a cualquier capítulo (1..150) */}
-          <select
-            value={activeChapter}
-            onChange={(e) => onSelectPassage(activeBookId, Number(e.target.value))}
-            className="text-xs font-mono font-bold bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded-md px-1.5 py-0.5 text-stone-800 dark:text-stone-100 cursor-pointer shadow-2xs focus:ring-1 focus:ring-amber-500"
-            title="Desplegable para elegir cualquier capítulo"
+      <div className="px-3.5 py-1.5 bg-stone-100/80 dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 overflow-x-auto no-scrollbar z-10">
+        <span className="text-xs text-stone-700 dark:text-stone-300 mr-1.5 font-serif font-semibold shrink-0">Capítulo:</span>
+        {Array.from({ length: currentBook.chaptersCount }, (_, i) => i + 1).map((ch) => (
+          <button
+            key={ch}
+            onClick={() => onSelectPassage(activeBookId, ch)}
+            className={`w-6 h-6 shrink-0 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
+              ch === activeChapter
+                ? 'bg-amber-700 text-white shadow-2xs font-bold'
+                : 'text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100'
+            }`}
           >
-            {Array.from({ length: currentBook.chaptersCount }, (_, i) => i + 1).map((ch) => (
-              <option key={ch} value={ch}>
-                Capítulo {ch} de {currentBook.chaptersCount}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Acceso rápido a todos los capítulos sin límite artificial */}
-        <div className="flex items-center gap-1 shrink-0">
-          {Array.from({ length: currentBook.chaptersCount }, (_, i) => i + 1).map((ch) => (
-            <button
-              key={ch}
-              onClick={() => onSelectPassage(activeBookId, ch)}
-              className={`w-6 h-6 shrink-0 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
-                ch === activeChapter
-                  ? 'bg-amber-700 text-white shadow-2xs font-bold'
-                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100'
-              }`}
-            >
-              {ch}
-            </button>
-          ))}
-        </div>
+            {ch}
+          </button>
+        ))}
 
         {isLoadingVerses && (
           <Loader2 className="w-3 h-3 text-amber-600 animate-spin ml-2 shrink-0" />
