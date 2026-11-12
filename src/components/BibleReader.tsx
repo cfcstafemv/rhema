@@ -28,7 +28,9 @@ import {
   MapPin,
   Download,
   ExternalLink,
+  ArrowRightLeft,
 } from 'lucide-react';
+import { VerseVersionComparatorModal } from './VerseVersionComparatorModal';
 import {
   BibleVerse,
   VerseHighlight,
@@ -139,6 +141,29 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const [isFootnoteCopied, setIsFootnoteCopied] = useState(false);
   const [activeMapModal, setActiveMapModal] = useState<{ verse: BibleVerse; map: VerseMap } | null>(null);
   const [isMapCopied, setIsMapCopied] = useState(false);
+  const [isDownloadingMap, setIsDownloadingMap] = useState(false);
+  const [activeComparatorVerse, setActiveComparatorVerse] = useState<BibleVerse | null>(null);
+
+  const handleDownloadMapImage = async (url: string, title: string) => {
+    setIsDownloadingMap(true);
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error('Fetch failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `Mapa_${(title || 'biblico').replace(/[\s\W]+/g, '_')}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } finally {
+      setIsDownloadingMap(false);
+    }
+  };
   const [pastedText, setPastedText] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [isOnline, setIsOnline] = useState<boolean>(() => (typeof navigator !== 'undefined' ? navigator.onLine : true));
@@ -1230,6 +1255,19 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
               <Lightbulb className="w-3 h-3" />
               <span>Ilustración</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveComparatorVerse(activeVerseForMenu);
+                setMenuPosition(null);
+              }}
+              className="col-span-2 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-indigo-700/80 hover:bg-indigo-700 text-white font-medium transition-colors cursor-pointer text-[11px]"
+              title="Comparar este pasaje en RVR1960, NTV y NBLA"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-200" />
+              <span>Comparar Versiones (RVR / NTV / NBLA)</span>
+            </button>
           </div>
         </div>
       )}
@@ -1517,17 +1555,25 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             <div className="px-5 py-3 border-t border-stone-200 dark:border-stone-800 bg-stone-50/70 dark:bg-stone-800/40 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 {/* Botón Guardar / Descargar imagen */}
-                <a
-                  href={activeMapModal.map.imageUrl}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-medium cursor-pointer transition-colors shadow-2xs"
+                <button
+                  type="button"
+                  onClick={() => handleDownloadMapImage(activeMapModal.map.imageUrl, activeMapModal.map.title)}
+                  disabled={isDownloadingMap}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-200 text-xs font-medium cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
                   title="Descargar o guardar imagen directamente en tu dispositivo"
                 >
-                  <Download className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
-                  <span>Guardar imagen</span>
-                </a>
+                  {isDownloadingMap ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                      <span>Descargando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5 text-stone-600 dark:text-stone-300" />
+                      <span>Guardar imagen</span>
+                    </>
+                  )}
+                </button>
 
                 {/* Botón Copiar Enlace */}
                 <button
@@ -1816,6 +1862,16 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal de Comparación Paralela de Versiones */}
+      <VerseVersionComparatorModal
+        isOpen={Boolean(activeComparatorVerse)}
+        onClose={() => setActiveComparatorVerse(null)}
+        verse={activeComparatorVerse}
+        currentTranslation={currentTranslation}
+        onCreateLinkedCard={onCreateLinkedCard}
+        onAddHighlight={onAddHighlight}
+      />
     </div>
   );
 };

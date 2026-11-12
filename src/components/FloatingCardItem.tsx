@@ -51,10 +51,20 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const [isEditingTag, setIsEditingTag] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const cardTypeInfo = CARD_TYPES.find((t) => t.id === card.type) || CARD_TYPES[0];
+  const [tagInput, setTagInput] = useState(
+    card.customTypeLabel || card.tags?.[0] || (typeLabels && typeLabels[card.type]) || cardTypeInfo.label
+  );
+
+  useEffect(() => {
+    setTagInput(
+      card.customTypeLabel || card.tags?.[0] || (typeLabels && typeLabels[card.type]) || cardTypeInfo.label
+    );
+  }, [card.customTypeLabel, card.tags, card.type, typeLabels, cardTypeInfo.label]);
 
   // Dragging logic - Mouse
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -196,6 +206,47 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
         <div className="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
           <GripHorizontal className="w-3.5 h-3.5 text-stone-400 shrink-0" />
           <span className="shrink-0">{renderTypeIcon()}</span>
+          {isEditingTag ? (
+            <input
+              type="text"
+              autoFocus
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onBlur={() => {
+                setIsEditingTag(false);
+                const trimmed = tagInput.trim();
+                onUpdate(card.id, {
+                  customTypeLabel: trimmed || undefined,
+                  tags: trimmed ? [trimmed] : [],
+                });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              placeholder="Etiqueta..."
+              className="no-drag text-[11px] font-sans font-bold bg-white dark:bg-stone-800 border border-amber-500 rounded px-1.5 py-0 text-stone-800 dark:text-stone-100 focus:outline-none w-28 max-w-[130px]"
+            />
+          ) : (
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsEditingTag(true);
+              }}
+              className="no-drag flex items-center gap-1 cursor-pointer hover:bg-stone-200/60 dark:hover:bg-stone-700/60 px-1 py-0.5 rounded transition-colors group/tag min-w-0"
+              title="Haz clic para personalizar esta etiqueta (ej: Texto Bíblico, Contexto Histórico, etc.)"
+            >
+              <span className="text-[11px] font-sans font-semibold text-stone-700 dark:text-stone-300 truncate max-w-[115px] sm:max-w-[130px]">
+                {card.customTypeLabel || card.tags?.[0] || (typeLabels && typeLabels[card.type]) || cardTypeInfo.label}
+              </span>
+              <PenLine className="w-2.5 h-2.5 text-stone-400 opacity-40 group-hover/tag:opacity-100 shrink-0" />
+            </div>
+          )}
+
+          {/* Selector de categoría base para paleta y semántica */}
           <select
             value={card.type}
             onChange={(e) => {
@@ -203,9 +254,15 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
                 if (onOpenEditDefaults) onOpenEditDefaults();
                 return;
               }
-              onUpdate(card.id, { type: e.target.value as CardType });
+              const newType = e.target.value as CardType;
+              const newTypeInfo = CARD_TYPES.find((t) => t.id === newType);
+              onUpdate(card.id, {
+                type: newType,
+                color: newTypeInfo ? newTypeInfo.color : card.color,
+              });
             }}
-            className="no-drag text-[11px] font-sans font-semibold bg-transparent border-0 text-stone-700 dark:text-stone-300 focus:ring-0 cursor-pointer truncate max-w-[130px] sm:max-w-[145px] py-0 pl-0.5 pr-2"
+            className="no-drag text-[10px] text-stone-400 dark:text-stone-500 bg-transparent border-0 focus:ring-0 cursor-pointer p-0 w-3.5 overflow-hidden"
+            title="Cambiar categoría base o color"
           >
             {CARD_TYPES.map((t) => (
               <option key={t.id} value={t.id} className="bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200">
@@ -214,25 +271,10 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
             ))}
             {onOpenEditDefaults && (
               <option value="__edit_defaults__" className="bg-amber-50 dark:bg-amber-950 font-bold text-amber-800 dark:text-amber-300">
-                ✏️ Editar títulos...
+                ✏️ Editar títulos predeterminados...
               </option>
             )}
           </select>
-
-          {onOpenEditDefaults && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenEditDefaults();
-              }}
-              className="p-1 text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors no-drag shrink-0 cursor-pointer"
-              title="Editar títulos predeterminados"
-              aria-label="Editar títulos predeterminados"
-            >
-              <PenLine className="w-2.5 h-2.5" />
-            </button>
-          )}
         </div>
 
         <div className="flex items-center gap-0.5 shrink-0 ml-1">

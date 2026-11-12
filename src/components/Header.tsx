@@ -10,7 +10,8 @@ import {
   FolderOpen, 
   Plus,
   PenLine,
-  Check
+  Check,
+  Search,
 } from 'lucide-react';
 import { SermonNote, SermonCategory, SERMON_CATEGORIES } from '../types';
 
@@ -23,6 +24,7 @@ interface HeaderProps {
   onOpenReflections: () => void;
   onOpenPresentationMode: () => void;
   onOpenExport: () => void;
+  onOpenQuickSearch?: () => void;
   onUpdateSermonMeta: (updates: Partial<SermonNote>) => void;
   activeView: 'split' | 'canvas-only' | 'bible-only';
   onViewChange: (view: 'split' | 'canvas-only' | 'bible-only') => void;
@@ -37,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenReflections,
   onOpenPresentationMode,
   onOpenExport,
+  onOpenQuickSearch,
   onUpdateSermonMeta,
   activeView,
   onViewChange,
@@ -117,6 +120,21 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: Primary Action & Quick Utilities */}
         <div className="flex items-center gap-2.5 shrink-0">
+          {/* Quick Passage Search button */}
+          {onOpenQuickSearch && (
+            <button
+              onClick={onOpenQuickSearch}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white bg-stone-100 hover:bg-stone-200/70 dark:bg-stone-800 dark:hover:bg-stone-700/80 rounded-lg border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+              title="Búsqueda rápida de pasajes bíblicos (Ctrl+K)"
+            >
+              <Search className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span className="hidden sm:inline">Buscar</span>
+              <kbd className="hidden md:inline px-1 py-0.5 text-[9px] font-mono text-stone-400 bg-white dark:bg-stone-900 rounded border border-stone-300 dark:border-stone-700">
+                ⌘K
+              </kbd>
+            </button>
+          )}
+
           {/* View switcher on larger screens */}
           <div className="hidden sm:flex items-center p-0.5 bg-stone-200/70 dark:bg-stone-800 rounded-lg text-xs font-medium">
             <button

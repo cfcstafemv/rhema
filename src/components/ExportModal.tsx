@@ -29,6 +29,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   sermon,
 }) => {
   const [isExportingImage, setIsExportingImage] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState(false);
   const exportCardRef = useRef<HTMLDivElement>(null);
 
@@ -38,19 +39,57 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const handleDownloadPNG = async () => {
     if (!exportCardRef.current) return;
     setIsExportingImage(true);
+    setExportError(null);
 
     try {
-      const canvas = await html2canvas(exportCardRef.current, {
+      const cardEl = exportCardRef.current;
+      const canvas = await html2canvas(cardEl, {
         scale: 2, // High resolution
         useCORS: true,
+        allowTaint: false,
+        logging: false,
         backgroundColor: '#FBF9F5',
+        onclone: (clonedDoc) => {
+          const imgs = clonedDoc.getElementsByTagName('img');
+          for (let i = 0; i < imgs.length; i++) {
+            imgs[i].crossOrigin = 'anonymous';
+          }
+        },
       });
 
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `Rhema_Predica_${sermon.title.replace(/[\s\W]+/g, '_')}.png`;
-      link.href = dataUrl;
-      link.click();
+      const fileName = `Rhema_Predica_${(sermon.title || 'Resumen').replace(/[\s\W]+/g, '_')}.png`;
+
+      if (canvas.toBlob) {
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            // Fallback to dataURL
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          } else {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = fileName;
+            link.href = blobUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+          }
+        }, 'image/png');
+      } else {
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
 
       // Confetti celebration
       confetti({
@@ -58,8 +97,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         spread: 60,
         origin: { y: 0.7 },
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error generating image export:', err);
+      setExportError(
+        'El navegador restringió la descarga directa de la imagen por políticas de seguridad. Puedes usar "Imprimir / PDF" para guardarlo en alta calidad.'
+      );
     } finally {
       setIsExportingImage(false);
     }
@@ -103,6 +145,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <img
               src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
               alt="Rhema Logo"
+              crossOrigin="anonymous"
               className="w-8 h-8 rounded-lg object-contain bg-white border border-stone-200 dark:border-stone-700 p-0.5"
             />
             <div>
@@ -122,6 +165,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Export Error Alert if any */}
+        {exportError && (
+          <div className="px-5 py-2.5 bg-rose-50 dark:bg-rose-950/60 border-b border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-200 flex items-center justify-between no-print">
+            <span>{exportError}</span>
+            <button
+              onClick={() => setExportError(null)}
+              className="text-rose-600 hover:text-rose-800 font-bold ml-2 cursor-pointer"
+            >
+              ×
+            </button>
+          </div>
+        )}
 
         {/* Action Buttons Ribbon */}
         <div className="p-3 bg-stone-100 dark:bg-stone-900/40 border-b border-stone-200 dark:border-stone-800 flex flex-wrap items-center justify-between gap-2 text-xs no-print">
@@ -205,6 +261,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <img
                   src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
                   alt="Rhema Logo"
+                  crossOrigin="anonymous"
                   className="w-full h-full object-contain"
                 />
               </div>

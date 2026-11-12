@@ -11,18 +11,21 @@ import {
   Lightbulb, 
   Compass,
   Move,
-  Settings2
+  Settings2,
+  Layers,
 } from 'lucide-react';
 import { FloatingCard, ConnectionLink, VerseHighlight, CardType } from '../types';
 import { FloatingCardItem } from './FloatingCardItem';
 import { CARD_TYPES } from '../data/bibleData';
 import { getCustomCardTypeLabels } from '../services/storage';
 import { EditCardTypesModal } from './EditCardTypesModal';
+import { SermonTemplatesModal } from './SermonTemplatesModal';
 
 interface CanvasBoardProps {
   cards: FloatingCard[];
   links: ConnectionLink[];
   highlights: VerseHighlight[];
+  onApplyTemplate?: (cards: FloatingCard[], mode: 'replace' | 'append') => void;
   onUpdateCard: (id: string, updates: Partial<FloatingCard>) => void;
   onDeleteCard: (id: string) => void;
   onAddCard: (cardType: CardType) => void;
@@ -38,6 +41,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   onDeleteCard,
   onAddCard,
   onNavigateToLinkedVerse,
+  onApplyTemplate,
   isSplitView,
 }) => {
   const [zoom, setZoom] = useState(1);
@@ -45,6 +49,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [startPan, setStartPan] = useState({ x: 0, y: 0 });
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
+  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [typeLabels, setTypeLabels] = useState<Record<CardType, string>>(getCustomCardTypeLabels());
   const [isEditCardTypesOpen, setIsEditCardTypesOpen] = useState(false);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 800 });
@@ -228,6 +233,18 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
           <Grid className="w-3.5 h-3.5 text-stone-500" />
           <span className="hidden sm:inline">Acomodar</span>
         </button>
+
+        {/* Templates button */}
+        {onApplyTemplate && (
+          <button
+            onClick={() => setIsTemplatesOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/80 dark:bg-stone-900/80 backdrop-blur-md hover:bg-white dark:hover:bg-stone-900 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-800 shadow-sm text-xs font-medium transition-colors cursor-pointer"
+            title="Plantillas Homiléticas (Expositivo, Temático, Inductivo)"
+          >
+            <Layers className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span className="hidden sm:inline">Plantillas</span>
+          </button>
+        )}
       </div>
 
       {/* Floating Canvas Zoom & View Controls (Bottom Right) */}
@@ -400,6 +417,16 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
         onClose={() => setIsEditCardTypesOpen(false)}
         onLabelsUpdated={(updated) => setTypeLabels(updated)}
       />
+
+      {/* Homiletical Templates Modal */}
+      {onApplyTemplate && (
+        <SermonTemplatesModal
+          isOpen={isTemplatesOpen}
+          onClose={() => setIsTemplatesOpen(false)}
+          onApplyTemplate={onApplyTemplate}
+          currentCardsCount={cards.length}
+        />
+      )}
     </div>
   );
 };

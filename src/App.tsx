@@ -6,6 +6,7 @@ import { PersonalReflectionsModal } from './components/PersonalReflectionsModal'
 import { PresentationMode } from './components/PresentationMode';
 import { ExportModal } from './components/ExportModal';
 import { SermonListModal } from './components/SermonListModal';
+import { QuickPassageSearchModal } from './components/QuickPassageSearchModal';
 import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection, SermonCategory } from './types';
 import {
   ChevronLeft,
@@ -38,6 +39,7 @@ export default function App() {
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isSermonsListOpen, setIsSermonsListOpen] = useState(false);
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -92,6 +94,18 @@ export default function App() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // Global keyboard shortcut for quick passage search (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsQuickSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleToggleDarkMode = () => {
@@ -301,6 +315,17 @@ export default function App() {
     setIsReflectionsOpen(false);
   };
 
+  const handleApplyTemplate = (newCards: FloatingCard[], mode: 'replace' | 'append') => {
+    const updated: SermonNote = {
+      ...sermon,
+      cards: mode === 'replace' ? newCards : [...sermon.cards, ...newCards],
+      links: mode === 'replace' ? [] : sermon.links,
+      updatedAt: Date.now(),
+    };
+    updateAndSaveSermon(updated);
+    setActiveView('split');
+  };
+
   const handleNavigateToLinkedVerse = (verseRef: string) => {
     const match = verseRef.match(/^([\w\s]+)\s+(\d+):(\d+)$/);
     if (match) {
@@ -403,6 +428,7 @@ export default function App() {
         onOpenReflections={() => setIsReflectionsOpen(true)}
         onOpenPresentationMode={() => setIsPresentationOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
+        onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
         onUpdateSermonMeta={handleUpdateSermonMeta}
         activeView={activeView}
         onViewChange={setActiveView}
@@ -470,6 +496,7 @@ export default function App() {
               onDeleteCard={handleDeleteCard}
               onAddCard={handleAddCard}
               onNavigateToLinkedVerse={handleNavigateToLinkedVerse}
+              onApplyTemplate={handleApplyTemplate}
               isSplitView={activeView === 'split' && !isBibleCollapsed}
             />
           </div>
@@ -573,6 +600,19 @@ export default function App() {
         onDeleteSermon={handleDeleteSermon}
         onImportSuccess={handleImportSuccess}
         onUpdateSermonCategory={handleUpdateSermonCategory}
+      />
+
+      <QuickPassageSearchModal
+        isOpen={isQuickSearchOpen}
+        onClose={() => setIsQuickSearchOpen(false)}
+        onSelectPassage={(bookId, chapter, verse) => {
+          handleSelectPassage(bookId, chapter);
+          if (verse) {
+            setHighlightedVerseId(verse);
+          }
+        }}
+        currentBookId={sermon.activePassage.bookId}
+        currentChapter={sermon.activePassage.chapter}
       />
     </div>
   );
