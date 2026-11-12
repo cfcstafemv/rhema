@@ -47,7 +47,15 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = ({
   };
 
   const cleanText = cellLesson?.fullText || '';
-  const paragraphs = cleanText.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const rawParagraphs = cleanText.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const paragraphs =
+    rawParagraphs.length <= 2 && cleanText.length > 400
+      ? cleanText
+          .replace(/([\.?!»”])\s+(?=[A-ZÁÉÍÓÚÑ¿«“"\d])/g, '$1\n\n')
+          .split(/\n\s*\n/)
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : rawParagraphs;
 
   // Filter paragraphs if search query is present
   const filteredParagraphs = paragraphs.filter((p) => {

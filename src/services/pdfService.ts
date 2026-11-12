@@ -135,6 +135,9 @@ export async function extractTextFromPdf(file: File): Promise<string> {
       const dy = prev.y - curr.y;
 
       const hasBlankLineGap = dy > 16;
+      const endsWithSentencePunct =
+        /[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9»”"\)]\s*[\.\?\!]$/.test(prev.text) &&
+        !/(?:^|\s)(?:Sr|Sra|Dr|Dra|etc|vs|v|cap|núm|nro|aprox)\.$/i.test(prev.text);
       const isShortLinePuntoYAparte =
         prev.endX < maxEndX - 35 && /[\.\?\!\:\»\”\"\_\)]$/.test(prev.text);
       const isNewStructuralBlock =
@@ -142,10 +145,16 @@ export async function extractTextFromPdf(file: File): Promise<string> {
           curr.text
         );
       const isPrevStandaloneLine =
-        /^(?:LECCIÓN|LECTURA:|¿.+\?$|PARA\s+|EN\s+RES[UÚ]MEN:|_+)/i.test(prev.text) &&
+        /^(?:LECCIÓN|LECTURA:|¿.+\?$|\d+[\.\)]\s+|PARA\s+|EN\s+RES[UÚ]MEN:|_+)/i.test(prev.text) &&
         prev.endX < maxEndX - 35;
 
-      if (hasBlankLineGap || isShortLinePuntoYAparte || isNewStructuralBlock || isPrevStandaloneLine) {
+      if (
+        hasBlankLineGap ||
+        endsWithSentencePunct ||
+        isShortLinePuntoYAparte ||
+        isNewStructuralBlock ||
+        isPrevStandaloneLine
+      ) {
         allParagraphs.push(currentPara.trim());
         currentPara = curr.text;
       } else {
