@@ -4,6 +4,7 @@ import {
   Search,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   Link2,
   Highlighter,
   Trash2,
@@ -122,9 +123,12 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 }) => {
   const [searchBook, setSearchBook] = useState('');
   const [isBookDropdownOpen, setIsBookDropdownOpen] = useState(false);
+  const [isChapterDropdownOpen, setIsChapterDropdownOpen] = useState(false);
   const [isTranslationDropdownOpen, setIsTranslationDropdownOpen] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const [activeVerseForMenu, setActiveVerseForMenu] = useState<BibleVerse | null>(null);
+  const [activeVersesForMenu, setActiveVersesForMenu] = useState<BibleVerse[]>([]);
+  const isSelectingRef = useRef(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const [selectedHighlightId, setSelectedHighlightId] = useState<string | null>(null);
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
@@ -228,15 +232,18 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const otBooks = filteredBooks.filter((b) => b.testament === 'AT');
   const ntBooks = filteredBooks.filter((b) => b.testament === 'NT');
 
-  // Robust text selection checking for desktop and mobile
+  // Robust text selection checking for single or multiple verses without overlapping
   const checkTextSelection = () => {
+    // If the user is actively dragging the mouse or holding a touch selection, wait until release
+    if (isSelectingRef.current) return;
+
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed) return;
 
     const text = selection.toString().trim();
     if (!text || text.length === 0) return;
 
-    // Ignore selections originating inside the floating toolbar itself
+    // Ignore selections originating inside the floating toolbar itself or modals
     const anchorElem =
       selection.anchorNode instanceof HTMLElement
         ? selection.anchorNode
@@ -248,55 +255,130 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
     if (
       anchorElem?.closest('#bible-floating-toolbar') ||
-      focusElem?.closest('#bible-floating-toolbar')
+      focusElem?.closest('#bible-floating-toolbar') ||
+      anchorElem?.closest('.bible-modal-content') ||
+      focusElem?.closest('.bible-modal-content')
     ) {
       return;
     }
 
-    const verseElem = (anchorElem?.closest('.bible-verse-row') ||
-      focusElem?.closest('.bible-verse-row')) as HTMLElement | null;
+    let targetVerses: BibleVerse[] = [];
 
-    if (verseElem) {
-      const verseAttr = verseElem.getAttribute('data-verse');
-      const verseNum = verseAttr ? parseInt(verseAttr, 10) : null;
-      const verse = verses.find((v) => Number(v.verse) === Number(verseNum));
+    try {
+      const range = selection.getRangeAt(0);
+      const allVerseRows = Array.from(
+        readerContainerRef.current?.querySelectorAll<HTMLElement>('.bible-verse-row') || []
+      );
 
-      if (verse) {
+      // Detect all verse rows intersecting the selection range (supports multiple verses)
+      const intersectingRows = allVerseRows.filter((row) => {
         try {
-          const range = selection.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
-          setSelectedText(text);
-          setActiveVerseForMenu(verse);
-          setSelectedHighlightId(null);
-          setMenuPosition({
-            x: Math.min(Math.max(16, rect.left + rect.width / 2), window.innerWidth - 180),
-            y: Math.max(rect.top - 65, 75),
-          });
+          return range.intersectsNode(row);
         } catch {
-          const rect = verseElem.getBoundingClientRect();
-          setSelectedText(text);
-          setActiveVerseForMenu(verse);
-          setSelectedHighlightId(null);
-          setMenuPosition({
-            x: Math.min(Math.max(16, rect.left + 80), window.innerWidth - 180),
-            y: Math.max(rect.top - 65, 75),
-          });
+          return false;
         }
+      });
+
+      if (intersectingRows.length > 0) {
+        const verseNumbers = intersectingRows
+          .map((r) => parseInt(r.getAttribute('data-verse') || '0', 10))
+          .filter((n) => n > 0);
+        if (verseNumbers.length > 0) {
+          const minV = Math.min(...verseNumbers);
+          const maxV = Math.max(...verseNumbers);
+          targetVerses = verses.filter((v) => v.verse >= minV && v.verse <= maxV);
+        }
+      }
+    } catch {
+      // Fallback to anchor & focus elements
+    }
+
+    if (targetVerses.length === 0) {
+      const startVerseElem = anchorElem?.closest('.bible-verse-row') as HTMLElement | null;
+      const endVerseElem = focusElem?.closest('.bible-verse-row') as HTMLElement | null;
+
+      if (startVerseElem && endVerseElem) {
+        const v1 = parseInt(startVerseElem.getAttribute('data-verse') || '0', 10);
+        const v2 = parseInt(endVerseElem.getAttribute('data-verse') || '0', 10);
+        if (v1 > 0 && v2 > 0) {
+          const minV = Math.min(v1, v2);
+          const maxV = Math.max(v1, v2);
+          targetVerses = verses.filter((v) => v.verse >= minV && v.verse <= maxV);
+        }
+      } else if (startVerseElem || endVerseElem) {
+        const vElem = (startVerseElem || endVerseElem)!;
+        const vNum = parseInt(vElem.getAttribute('data-verse') || '0', 10);
+        const matched = verses.find((v) => v.verse === vNum);
+        if (matched) targetVerses = [matched];
+      }
+    }
+
+    if (targetVerses.length > 0) {
+      try {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        setSelectedText(text);
+        setActiveVerseForMenu(targetVerses[0]);
+        setActiveVersesForMenu(targetVerses);
+        setSelectedHighlightId(null);
+
+        // Safe toolbar positioning: NEVER overlaps or hides the selected text
+        const toolbarHeight = 160;
+        const spaceAbove = rect.top - 70; // 70px accounts for top header
+        const placeAbove = spaceAbove >= toolbarHeight + 15;
+
+        const yPos = placeAbove
+          ? rect.top - toolbarHeight - 12
+          : Math.min(rect.bottom + 12, window.innerHeight - toolbarHeight - 20);
+
+        const xPos = Math.min(
+          Math.max(16, rect.left + rect.width / 2 - 160),
+          window.innerWidth - 340
+        );
+
+        setMenuPosition({
+          x: xPos,
+          y: Math.max(75, yPos),
+        });
+      } catch {
+        const row =
+          anchorElem?.closest('.bible-verse-row') ||
+          focusElem?.closest('.bible-verse-row') ||
+          readerContainerRef.current;
+        const rect = row?.getBoundingClientRect() || {
+          left: 50,
+          top: 200,
+          bottom: 250,
+          width: 200,
+        };
+        setSelectedText(text);
+        setActiveVerseForMenu(targetVerses[0]);
+        setActiveVersesForMenu(targetVerses);
+        setSelectedHighlightId(null);
+        setMenuPosition({
+          x: Math.min(Math.max(16, rect.left + 40), window.innerWidth - 340),
+          y: Math.min(rect.bottom + 12, window.innerHeight - 180),
+        });
       }
     }
   };
 
-  // Selection change listener for touch devices and mouse release
+  // Selection change listener: ONLY triggers after drag is completely finished
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
     const handleSelectionChange = () => {
+      // Do nothing if user is actively dragging mouse or finger
+      if (isSelectingRef.current) return;
+
       clearTimeout(timeout);
       timeout = setTimeout(() => {
-        const sel = window.getSelection();
-        if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
-          checkTextSelection();
+        if (!isSelectingRef.current) {
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+            checkTextSelection();
+          }
         }
-      }, 150);
+      }, 200);
     };
 
     document.addEventListener('selectionchange', handleSelectionChange);
@@ -318,6 +400,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         setMenuPosition(null);
         setSelectedText('');
         setActiveVerseForMenu(null);
+        setActiveVersesForMenu([]);
         setSelectedHighlightId(null);
       }
     };
@@ -328,62 +411,130 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
   const applyHighlight = (category: HighlightCategory, color: string) => {
     if (!activeVerseForMenu) return;
 
-    const textToHighlight = (selectedText || activeVerseForMenu.text).trim();
+    const targetVerses = activeVersesForMenu.length > 0 ? activeVersesForMenu : [activeVerseForMenu];
+    const textToHighlight = (selectedText || targetVerses.map((v) => v.text).join(' ')).trim();
 
-    const newHighlightId = onAddHighlight({
-      bookId: activeVerseForMenu.bookId,
-      bookName: activeVerseForMenu.bookName,
-      chapter: activeVerseForMenu.chapter,
-      verse: activeVerseForMenu.verse,
-      selectedText: textToHighlight,
-      fullVerseText: activeVerseForMenu.text,
-      category,
-      color,
+    if (targetVerses.length === 1) {
+      const singleVerse = targetVerses[0];
+      const newHighlightId = onAddHighlight({
+        bookId: singleVerse.bookId,
+        bookName: singleVerse.bookName,
+        chapter: singleVerse.chapter,
+        verse: singleVerse.verse,
+        selectedText: textToHighlight,
+        fullVerseText: singleVerse.text,
+        category,
+        color,
+      });
+
+      setMenuPosition(null);
+      setSelectedText('');
+      setActiveVerseForMenu(null);
+      setActiveVersesForMenu([]);
+
+      if (window.getSelection) {
+        window.getSelection()?.removeAllRanges();
+      }
+
+      return newHighlightId;
+    }
+
+    // Multiple verses selected: create highlights for each verse in the range
+    let firstHlId = '';
+    targetVerses.forEach((v) => {
+      let versePortion = v.text;
+      const lowerSel = textToHighlight.toLowerCase();
+
+      // Check if partial overlap
+      if (!lowerSel.includes(v.text.toLowerCase().trim())) {
+        const words = v.text.split(' ');
+        const matched = words.filter(
+          (w) => w.trim().length > 1 && lowerSel.includes(w.toLowerCase().trim())
+        );
+        if (matched.length > 0) {
+          versePortion = matched.join(' ');
+        }
+      }
+
+      const hlId = onAddHighlight({
+        bookId: v.bookId,
+        bookName: v.bookName,
+        chapter: v.chapter,
+        verse: v.verse,
+        selectedText: versePortion,
+        fullVerseText: v.text,
+        category,
+        color,
+      });
+      if (!firstHlId) firstHlId = hlId;
     });
 
     setMenuPosition(null);
     setSelectedText('');
     setActiveVerseForMenu(null);
+    setActiveVersesForMenu([]);
 
     if (window.getSelection) {
       window.getSelection()?.removeAllRanges();
     }
 
-    return newHighlightId;
+    return firstHlId;
   };
 
   const handleCreateCardFromSelection = (cardType: CardType = 'central') => {
     if (!activeVerseForMenu) return;
 
-    const textToHighlight = selectedText || activeVerseForMenu.text;
-    const ref = `${activeVerseForMenu.bookName} ${activeVerseForMenu.chapter}:${activeVerseForMenu.verse}`;
+    const targetVerses = activeVersesForMenu.length > 0 ? activeVersesForMenu : [activeVerseForMenu];
+    const firstVerse = targetVerses[0];
+    const lastVerse = targetVerses[targetVerses.length - 1];
 
-    const existing = highlights.find(
-      (h) =>
-        h.bookId === activeVerseForMenu.bookId &&
-        h.chapter === activeVerseForMenu.chapter &&
-        h.verse === activeVerseForMenu.verse &&
-        h.selectedText === textToHighlight
-    );
+    const ref =
+      firstVerse.verse === lastVerse.verse
+        ? `${firstVerse.bookName} ${firstVerse.chapter}:${firstVerse.verse}`
+        : `${firstVerse.bookName} ${firstVerse.chapter}:${firstVerse.verse}-${lastVerse.verse}`;
 
-    let hlId = existing ? existing.id : selectedHighlightId;
+    const textToHighlight = (selectedText || targetVerses.map((v) => v.text).join(' ')).trim();
+
+    let hlId = selectedHighlightId;
     if (!hlId) {
       hlId = onAddHighlight({
-        bookId: activeVerseForMenu.bookId,
-        bookName: activeVerseForMenu.bookName,
-        chapter: activeVerseForMenu.chapter,
-        verse: activeVerseForMenu.verse,
+        bookId: firstVerse.bookId,
+        bookName: firstVerse.bookName,
+        chapter: firstVerse.chapter,
+        verse: firstVerse.verse,
         selectedText: textToHighlight,
-        fullVerseText: activeVerseForMenu.text,
+        fullVerseText: targetVerses.map((v) => v.text).join(' '),
         category: cardType === 'central' ? 'central' : 'promise',
         color: cardType === 'central' ? '#F59E0B' : '#3B82F6',
       });
+
+      // If multi-verse, also add highlight to remaining verses so they show in the reader
+      if (targetVerses.length > 1) {
+        for (let i = 1; i < targetVerses.length; i++) {
+          const v = targetVerses[i];
+          onAddHighlight({
+            bookId: v.bookId,
+            bookName: v.bookName,
+            chapter: v.chapter,
+            verse: v.verse,
+            selectedText: v.text,
+            fullVerseText: v.text,
+            category: cardType === 'central' ? 'central' : 'promise',
+            color: cardType === 'central' ? '#F59E0B' : '#3B82F6',
+          });
+        }
+      }
     }
 
     onCreateLinkedCard(hlId, textToHighlight, ref, cardType);
     setMenuPosition(null);
     setSelectedText('');
     setActiveVerseForMenu(null);
+    setActiveVersesForMenu([]);
+
+    if (window.getSelection) {
+      window.getSelection()?.removeAllRanges();
+    }
   };
 
   const handleSavePastedText = () => {
@@ -526,11 +677,100 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
             )}
           </div>
 
+          {/* Selector de Capítulo Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setIsChapterDropdownOpen(!isChapterDropdownOpen);
+                setIsBookDropdownOpen(false);
+                setIsTranslationDropdownOpen(false);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-100 text-xs font-mono font-bold transition-colors cursor-pointer border border-stone-200 dark:border-stone-700 shadow-2xs"
+              title="Seleccionar capítulo de este libro"
+            >
+              <span>Cap. {activeChapter}</span>
+              <ChevronDown className="w-3 h-3 text-stone-400" />
+            </button>
+
+            {isChapterDropdownOpen && (
+              <div
+                className="fixed inset-0 z-40 bg-black/25"
+                onClick={() => setIsChapterDropdownOpen(false)}
+              />
+            )}
+
+            {isChapterDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1.5 w-72 sm:w-80 rounded-xl shadow-2xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#181B22] text-stone-900 dark:text-stone-100 z-50 p-3 text-xs isolate animate-in fade-in zoom-in-95">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-stone-100 dark:border-stone-800">
+                  <div>
+                    <span className="font-serif font-bold text-stone-900 dark:text-stone-100 text-xs block">
+                      {currentBook.name}
+                    </span>
+                    <span className="text-[10px] text-stone-500 dark:text-stone-400">
+                      {currentBook.chaptersCount} capítulos disponibles
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={activeChapter <= 1}
+                      onClick={() => {
+                        if (activeChapter > 1) {
+                          onSelectPassage(activeBookId, activeChapter - 1);
+                        }
+                      }}
+                      className="px-2 py-1 rounded bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-30 cursor-pointer flex items-center gap-1 text-[11px]"
+                      title="Capítulo anterior"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Ant.</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={activeChapter >= currentBook.chaptersCount}
+                      onClick={() => {
+                        if (activeChapter < currentBook.chaptersCount) {
+                          onSelectPassage(activeBookId, activeChapter + 1);
+                        }
+                      }}
+                      className="px-2 py-1 rounded bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 disabled:opacity-30 cursor-pointer flex items-center gap-1 text-[11px]"
+                      title="Capítulo siguiente"
+                    >
+                      <span className="hidden sm:inline">Sig.</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto pr-1 grid grid-cols-5 sm:grid-cols-6 gap-1.5 custom-scrollbar">
+                  {Array.from({ length: currentBook.chaptersCount }, (_, i) => i + 1).map((ch) => (
+                    <button
+                      key={ch}
+                      type="button"
+                      onClick={() => {
+                        onSelectPassage(activeBookId, ch);
+                        setIsChapterDropdownOpen(false);
+                      }}
+                      className={`h-8 rounded-lg font-mono font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
+                        ch === activeChapter
+                          ? 'bg-amber-700 text-white shadow-xs scale-105 ring-2 ring-amber-500/50'
+                          : 'bg-stone-100 dark:bg-stone-800/80 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200'
+                      }`}
+                    >
+                      {ch}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="relative">
             <button
               onClick={() => {
                 setIsTranslationDropdownOpen(!isTranslationDropdownOpen);
                 setIsBookDropdownOpen(false);
+                setIsChapterDropdownOpen(false);
               }}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-100 text-xs font-mono font-bold transition-colors cursor-pointer border border-stone-200 dark:border-stone-700 shadow-2xs"
               title="Cambiar versión o traducción de la Biblia"
@@ -608,24 +848,40 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
         </div>
       </div>
 
-      <div className="px-3.5 py-1.5 bg-stone-100/80 dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 flex items-center gap-1 overflow-x-auto no-scrollbar z-10">
-        <span className="text-xs text-stone-700 dark:text-stone-300 mr-1.5 font-serif font-semibold shrink-0">Capítulo:</span>
-        {Array.from({ length: Math.min(currentBook.chaptersCount, 25) }, (_, i) => i + 1).map((ch) => (
-          <button
-            key={ch}
-            onClick={() => onSelectPassage(activeBookId, ch)}
-            className={`w-6 h-6 shrink-0 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
-              ch === activeChapter
-                ? 'bg-amber-700 text-white shadow-2xs font-bold'
-                : 'text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100'
-            }`}
+      <div className="px-3 py-1.5 bg-stone-100/90 dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 overflow-x-auto no-scrollbar z-10">
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-xs text-stone-700 dark:text-stone-300 font-serif font-semibold">Cap:</span>
+          {/* Menú desplegable completo para saltar a cualquier capítulo (1..150) */}
+          <select
+            value={activeChapter}
+            onChange={(e) => onSelectPassage(activeBookId, Number(e.target.value))}
+            className="text-xs font-mono font-bold bg-white dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded-md px-1.5 py-0.5 text-stone-800 dark:text-stone-100 cursor-pointer shadow-2xs focus:ring-1 focus:ring-amber-500"
+            title="Desplegable para elegir cualquier capítulo"
           >
-            {ch}
-          </button>
-        ))}
-        {currentBook.chaptersCount > 25 && (
-          <span className="text-xs text-stone-500 dark:text-stone-400 px-1 font-mono">+{currentBook.chaptersCount - 25}</span>
-        )}
+            {Array.from({ length: currentBook.chaptersCount }, (_, i) => i + 1).map((ch) => (
+              <option key={ch} value={ch}>
+                Capítulo {ch} de {currentBook.chaptersCount}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Acceso rápido a todos los capítulos sin límite artificial */}
+        <div className="flex items-center gap-1 shrink-0">
+          {Array.from({ length: currentBook.chaptersCount }, (_, i) => i + 1).map((ch) => (
+            <button
+              key={ch}
+              onClick={() => onSelectPassage(activeBookId, ch)}
+              className={`w-6 h-6 shrink-0 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
+                ch === activeChapter
+                  ? 'bg-amber-700 text-white shadow-2xs font-bold'
+                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-200 dark:hover:bg-stone-800 hover:text-stone-900 dark:hover:text-stone-100'
+              }`}
+            >
+              {ch}
+            </button>
+          ))}
+        </div>
 
         {isLoadingVerses && (
           <Loader2 className="w-3 h-3 text-amber-600 animate-spin ml-2 shrink-0" />
@@ -634,9 +890,19 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
 
       <div
         ref={readerContainerRef}
-        onMouseUp={checkTextSelection}
+        onMouseDown={() => {
+          isSelectingRef.current = true;
+        }}
+        onMouseUp={() => {
+          isSelectingRef.current = false;
+          setTimeout(checkTextSelection, 40);
+        }}
+        onTouchStart={() => {
+          isSelectingRef.current = true;
+        }}
         onTouchEnd={() => {
-          setTimeout(checkTextSelection, 120);
+          isSelectingRef.current = false;
+          setTimeout(checkTextSelection, 100);
         }}
         className={`flex-1 overflow-y-auto px-4 sm:px-6 py-5 space-y-3.5 font-serif text-stone-800 dark:text-stone-200 ${FONT_SIZE_CLASSES[readerSettings.fontSize]} relative`}
       >
@@ -714,12 +980,14 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     setActiveVerseForMenu(v);
+                    setActiveVersesForMenu([v]);
                     setSelectedText(v.text);
                     setSelectedHighlightId(null);
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    const placeAbove = rect.top > 210;
                     setMenuPosition({
-                      x: rect.left,
-                      y: Math.max(rect.top - 65, 75),
+                      x: Math.min(Math.max(16, rect.left), window.innerWidth - 340),
+                      y: placeAbove ? rect.top - 160 : rect.bottom + 8,
                     });
                   }}
                   className="font-mono text-xs font-bold text-amber-700 dark:text-amber-500 hover:text-amber-900 dark:hover:text-amber-300 hover:underline select-none pt-0.5 shrink-0 w-6 text-left cursor-pointer verse-highlight-trigger"
@@ -853,12 +1121,14 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     setActiveVerseForMenu(v);
+                    setActiveVersesForMenu([v]);
                     setSelectedText(v.text);
                     setSelectedHighlightId(null);
                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    const placeAbove = rect.top > 210;
                     setMenuPosition({
-                      x: rect.left,
-                      y: Math.max(rect.top - 65, 75),
+                      x: Math.min(Math.max(16, rect.left - 180), window.innerWidth - 340),
+                      y: placeAbove ? rect.top - 160 : rect.bottom + 8,
                     });
                   }}
                   className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 transition-opacity p-1.5 text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 cursor-pointer verse-highlight-trigger shrink-0"
@@ -882,19 +1152,27 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
           style={
             typeof window !== 'undefined' && window.innerWidth >= 640
               ? {
-                  left: `${Math.min(Math.max(16, menuPosition.x - 140), window.innerWidth - 340)}px`,
-                  top: `${Math.min(Math.max(70, menuPosition.y), window.innerHeight - 220)}px`,
+                  left: `${Math.min(Math.max(16, menuPosition.x), window.innerWidth - 340)}px`,
+                  top: `${Math.min(Math.max(70, menuPosition.y), window.innerHeight - 200)}px`,
                 }
               : undefined
           }
         >
           <div className="px-1.5 pt-0.5 pb-1 border-b border-stone-800 text-xs text-stone-300 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 truncate max-w-[230px]">
+            <div className="flex items-center gap-1.5 truncate max-w-[240px]">
               <span className="font-serif font-bold text-amber-400 truncate">
-                {activeVerseForMenu.bookName} {activeVerseForMenu.chapter}:{activeVerseForMenu.verse}
+                {activeVerseForMenu.bookName} {activeVerseForMenu.chapter}:{
+                  activeVersesForMenu.length > 1
+                    ? `${activeVersesForMenu[0].verse}-${activeVersesForMenu[activeVersesForMenu.length - 1].verse}`
+                    : activeVerseForMenu.verse
+                }
               </span>
               <span className="text-[10px] text-stone-400 shrink-0">
-                ({selectedText && selectedText !== activeVerseForMenu.text ? 'Selección' : 'Versículo'})
+                ({activeVersesForMenu.length > 1
+                  ? `${activeVersesForMenu.length} versículos`
+                  : selectedText && selectedText !== activeVerseForMenu.text
+                  ? 'Selección'
+                  : 'Versículo'})
               </span>
             </div>
             <button
@@ -903,6 +1181,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
                 setMenuPosition(null);
                 setSelectedText('');
                 setActiveVerseForMenu(null);
+                setActiveVersesForMenu([]);
                 setSelectedHighlightId(null);
               }}
               className="p-1 text-stone-400 hover:text-white rounded transition-colors cursor-pointer"
