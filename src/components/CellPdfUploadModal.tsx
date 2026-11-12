@@ -54,7 +54,7 @@ export const CellPdfUploadModal: React.FC<CellPdfUploadModalProps> = ({
         throw new Error('No se pudo extraer texto del PDF (podría ser un documento escaneado solo con imágenes). Puedes copiar y pegar el texto en la pestaña "Pegar Texto".');
       }
 
-      const parsed = parseCellLesson(extractedText, file.name);
+      const parsed = await parseCellLesson(extractedText, file.name);
       setParsedPreview(parsed);
     } catch (err: any) {
       console.error('Error procesando PDF:', err);
@@ -82,7 +82,7 @@ export const CellPdfUploadModal: React.FC<CellPdfUploadModalProps> = ({
     }
   };
 
-  const handleProcessPastedText = () => {
+  const handleProcessPastedText = async () => {
     if (!pastedText.trim() || pastedText.trim().length < 20) {
       setError('Por favor pega el contenido de la lección antes de continuar.');
       return;
@@ -92,7 +92,7 @@ export const CellPdfUploadModal: React.FC<CellPdfUploadModalProps> = ({
     setError(null);
 
     try {
-      const parsed = parseCellLesson(pastedText, pastedTitle.trim() || undefined);
+      const parsed = await parseCellLesson(pastedText, pastedTitle.trim() || undefined);
       setParsedPreview(parsed);
     } catch (err: any) {
       setError('Ocurrió un error al procesar el texto.');
@@ -101,14 +101,17 @@ export const CellPdfUploadModal: React.FC<CellPdfUploadModalProps> = ({
     }
   };
 
-  const handleLoadSample = () => {
+  const handleLoadSample = async () => {
     setIsProcessing(true);
     setError(null);
-    setTimeout(() => {
-      const sample = getSampleCellLesson();
+    try {
+      const sample = await getSampleCellLesson();
       setParsedPreview(sample);
+    } catch (err: any) {
+      setError('Error al cargar la lección de ejemplo.');
+    } finally {
       setIsProcessing(false);
-    }, 250);
+    }
   };
 
   const handleConfirmApply = () => {

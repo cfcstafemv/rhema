@@ -364,7 +364,14 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
           placeholder="Escribe las notas, argumentos del pastor, preguntas o citas..."
-          rows={3}
+          rows={Math.min(
+            10,
+            Math.max(
+              3,
+              Math.ceil((card.content?.length || 0) / 42) +
+                ((card.content?.match(/\n/g) || []).length)
+            )
+          )}
           className="w-full text-xs font-sans bg-transparent border-0 resize-none focus:outline-none text-stone-700 dark:text-stone-300 placeholder:text-stone-400/70 p-0 leading-relaxed"
         />
 

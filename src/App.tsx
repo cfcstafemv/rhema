@@ -9,7 +9,7 @@ import { SermonListModal } from './components/SermonListModal';
 import { QuickPassageSearchModal } from './components/QuickPassageSearchModal';
 import { CellLessonReader } from './components/CellLessonReader';
 import { CellPdfUploadModal } from './components/CellPdfUploadModal';
-import { ParsedCellLesson } from './services/pdfService';
+import { ParsedCellLesson, fetchVerseRangeText, parseCellLesson } from './services/pdfService';
 import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection, SermonCategory } from './types';
 import {
   ChevronLeft,
@@ -113,6 +113,75 @@ export default function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Auto-hydrate previously saved cell lesson cards & LECTURA mainScripture if they still have placeholder/fallback text
+  useEffect(() => {
+    if (!isCellMode || !sermon.cellLesson) return;
+
+    const needsCardHydration = sermon.cards.some(
+      (c) =>
+        c.linkedVerseRef &&
+        (c.content.includes('Pasaje de estudio citado') ||
+          c.content.includes('Abrir en la Biblia:') ||
+          (c.content.includes('Clama a mí, y yo te responderé') &&
+            !c.linkedVerseRef.toLowerCase().includes('jerem')) ||
+          (c.content.includes('Lámpara es a mis pies tu palabra') &&
+            !c.linkedVerseRef.toLowerCase().includes('salmo 119:105')))
+    );
+
+    const needsLecturaFix =
+      sermon.mainScripture.includes(',') &&
+      /lectura\s*:/i.test(sermon.cellLesson.fullText || '');
+
+    if (!needsCardHydration && !needsLecturaFix) return;
+
+    let cancelled = false;
+
+    (async () => {
+      let nextMainScripture = sermon.mainScripture;
+      if (needsLecturaFix && sermon.cellLesson?.fullText) {
+        const reparsed = await parseCellLesson(sermon.cellLesson.fullText, sermon.cellLesson.fileName);
+        if (reparsed.readingScripture) {
+          nextMainScripture = reparsed.readingScripture;
+        }
+      }
+
+      const updatedCards = await Promise.all(
+        sermon.cards.map(async (c) => {
+          if (!c.linkedVerseRef) return c;
+          const isPlaceholder =
+            c.content.includes('Pasaje de estudio citado') ||
+            c.content.includes('Abrir en la Biblia:') ||
+            (c.content.includes('Clama a mí, y yo te responderé') &&
+              !c.linkedVerseRef.toLowerCase().includes('jerem'));
+          if (!isPlaceholder) return c;
+
+          const realText = await fetchVerseRangeText(c.linkedVerseRef);
+          if (!realText) return c;
+          return {
+            ...c,
+            content: `«${realText}»`,
+            linkedQuote: realText,
+          };
+        })
+      );
+
+      if (cancelled) return;
+      const updatedSermon: SermonNote = {
+        ...sermon,
+        mainScripture: nextMainScripture,
+        cards: updatedCards,
+        updatedAt: Date.now(),
+      };
+      setSermon(updatedSermon);
+      saveSermon(updatedSermon);
+      setSermons(getAllSermons());
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sermon.id, isCellMode]);
 
   const handleToggleDarkMode = () => {
     const next = !isDarkMode;
@@ -355,14 +424,41 @@ export default function App() {
   };
 
   const handleCellLessonLoaded = (parsed: ParsedCellLesson) => {
-    const updated: SermonNote = {
-      ...sermon,
-      title: parsed.lessonTitle,
+    // Generar una nueva prédica/estudio con ID único para que la lección anterior quede guardada intacta en "Mis Prédicas"
+    const newLessonId = 'sermon-cell-' + Date.now();
+    const todayDate = new Date().toISOString().split('T')[0];
+
+    // Priority for mainScripture: parsed.readingScripture (from LECTURA:) -> detectedScriptures list
+    const primaryScriptureText =
+      parsed.readingScripture ||
+      (parsed.detectedScriptures.length > 0
+        ? parsed.detectedScriptures.map((s) => s.ref).join(', ')
+        : 'Lección de Célula');
+
+    // Find passage coordinates for activePassage
+    let activePassageObj = { bookId: 'rom', chapter: 13 };
+    if (parsed.detectedScriptures.length > 0 && parsed.detectedScriptures[0].bookId && parsed.detectedScriptures[0].chapter) {
+      activePassageObj = {
+        bookId: parsed.detectedScriptures[0].bookId,
+        chapter: parsed.detectedScriptures[0].chapter,
+      };
+    }
+
+    const newCellSermon: SermonNote = {
+      id: newLessonId,
+      title: parsed.lessonTitle || 'Lección de Célula',
       category: 'Células de estudio',
       studyMode: 'cell',
+      preacher: parsed.lessonNumber || 'LECCIÓN DE CÉLULA',
+      churchName: sermon.churchName || 'Comunidad de Fe',
+      date: todayDate,
+      series: 'Estudios de Célula',
+      mainScripture: primaryScriptureText,
+      activePassage: activePassageObj,
       cellLesson: {
         fileName: parsed.fileName,
         lessonTitle: parsed.lessonTitle,
+        lessonNumber: parsed.lessonNumber,
         fullText: parsed.fullText,
         detectedScriptures: parsed.detectedScriptures.map((s) => s.ref),
         detectedQuestions: parsed.detectedQuestions,
@@ -371,27 +467,24 @@ export default function App() {
       },
       cards: parsed.cards,
       links: parsed.links,
-      activePassage:
-        parsed.detectedScriptures.length > 0 &&
-        parsed.detectedScriptures[0].bookId &&
-        parsed.detectedScriptures[0].chapter
-          ? {
-              bookId: parsed.detectedScriptures[0].bookId,
-              chapter: parsed.detectedScriptures[0].chapter,
-            }
-          : sermon.activePassage,
-      mainScripture:
-        parsed.detectedScriptures.length > 0
-          ? parsed.detectedScriptures.map((s) => s.ref).join(', ')
-          : sermon.mainScripture,
+      highlights: [], // Limpiar resaltados previos
+      reflection: {
+        godSpokeToMe: '',
+        personalApplication: '',
+        prayerRequest: '',
+        spiritualCommitment: '',
+        keyGratitude: '',
+        updatedAt: Date.now(),
+      },
       updatedAt: Date.now(),
     };
-    updateAndSaveSermon(updated);
+
+    updateAndSaveSermon(newCellSermon);
     setActiveView('split');
   };
 
   const handleNavigateToLinkedVerse = (verseRef: string) => {
-    const match = verseRef.match(/^([\w\s]+)\s+(\d+):(\d+)$/);
+    const match = verseRef.match(/^(.+?)\s+(\d+):(\d+)(?:[-–—]\d+)?$/);
     if (match) {
       const bookName = match[1].trim();
       const chapter = parseInt(match[2], 10);

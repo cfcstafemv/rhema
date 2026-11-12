@@ -148,6 +148,7 @@ export const SERMON_CATEGORIES: SermonCategoryConfig[] = [
 export interface CellLessonData {
   fileName?: string;
   lessonTitle: string;
+  lessonNumber?: string;
   fullText: string;
   detectedScriptures: string[];
   detectedQuestions: string[];
