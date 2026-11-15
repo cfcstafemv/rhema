@@ -129,6 +129,9 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
       if (e.touches.length === 1) {
         const touch = e.touches[0];
         const newX = Math.round(touch.clientX / zoomScale - dragOffset.x);
@@ -146,7 +149,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleEnd);
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleEnd);
     window.addEventListener('touchcancel', handleEnd);
     return () => {
@@ -178,9 +181,10 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
     <div
       ref={cardRef}
       id={`floating-card-${card.id}`}
+      data-floating-card="true"
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
-      className={`absolute select-none rounded-xl bg-white dark:bg-stone-900 border transition-shadow duration-150 touch-none ${
+      className={`absolute select-none rounded-xl bg-white dark:bg-stone-900 border transition-shadow duration-150 touch-none overscroll-none ${
         isDragging
           ? 'shadow-2xl ring-2 ring-amber-500/50 cursor-grabbing'
           : 'shadow-md hover:shadow-lg'
@@ -239,7 +243,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
               className="no-drag flex items-center gap-1 cursor-pointer hover:bg-stone-200/60 dark:hover:bg-stone-700/60 px-1 py-0.5 rounded transition-colors group/tag min-w-0"
               title="Haz clic para personalizar esta etiqueta (ej: Texto Bíblico, Contexto Histórico, etc.)"
             >
-              <span className="text-[11px] font-sans font-semibold text-stone-700 dark:text-stone-300 truncate max-w-[115px] sm:max-w-[130px]">
+              <span className="text-[11px] font-sans font-semibold text-stone-700 dark:text-stone-300 truncate max-w-[95px] sm:max-w-[110px]">
                 {card.customTypeLabel || card.tags?.[0] || (typeLabels && typeLabels[card.type]) || cardTypeInfo.label}
               </span>
               <PenLine className="w-2.5 h-2.5 text-stone-400 opacity-40 group-hover/tag:opacity-100 shrink-0" />
@@ -277,19 +281,19 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           </select>
         </div>
 
-        <div className="flex items-center gap-0.5 shrink-0 ml-1">
+        <div className="flex items-center gap-2 shrink-0 ml-2">
           {/* Color palette toggle */}
           <div className="relative">
             <button
               onClick={() => setIsColorPickerOpen(!isColorPickerOpen)}
-              className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded transition-colors no-drag cursor-pointer"
+              className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-200/70 dark:hover:bg-stone-700/60 rounded-md transition-colors no-drag cursor-pointer"
               title="Cambiar color de tarjeta"
             >
               <Palette className="w-3.5 h-3.5" />
             </button>
 
             {isColorPickerOpen && (
-              <div className="absolute right-0 top-full mt-1 p-1.5 bg-white dark:bg-stone-800 rounded-lg shadow-xl border border-stone-200 dark:border-stone-700 flex items-center gap-1 z-50">
+              <div className="absolute right-0 top-full mt-1 p-2 bg-white dark:bg-stone-800 rounded-xl shadow-xl border border-stone-200 dark:border-stone-700 flex items-center gap-2 z-50">
                 {COLOR_OPTIONS.map((c) => (
                   <button
                     key={c}
@@ -297,7 +301,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
                       onUpdate(card.id, { color: c });
                       setIsColorPickerOpen(false);
                     }}
-                    className="w-4 h-4 rounded-full transition-transform hover:scale-125 cursor-pointer"
+                    className="w-5 h-5 rounded-full transition-transform hover:scale-125 cursor-pointer"
                     style={{ backgroundColor: c }}
                   />
                 ))}
@@ -308,7 +312,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           {/* Minimize toggle */}
           <button
             onClick={() => onUpdate(card.id, { isMinimized: !card.isMinimized })}
-            className="p-1 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 rounded transition-colors no-drag cursor-pointer"
+            className="p-1.5 text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 hover:bg-stone-200/70 dark:hover:bg-stone-700/60 rounded-md transition-colors no-drag cursor-pointer"
             title={card.isMinimized ? 'Expandir' : 'Minimizar'}
           >
             {card.isMinimized ? <Maximize2 className="w-3.5 h-3.5" /> : <Minimize2 className="w-3.5 h-3.5" />}
@@ -317,7 +321,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
           {/* Delete */}
           <button
             onClick={() => onDelete(card.id)}
-            className="p-1 text-stone-400 hover:text-rose-600 rounded transition-colors no-drag cursor-pointer"
+            className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-md transition-colors no-drag cursor-pointer"
             title="Eliminar tarjeta"
           >
             <Trash2 className="w-3.5 h-3.5" />

@@ -78,13 +78,27 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  // Pan interaction on canvas background
+  const [pinchStartDist, setPinchStartDist] = useState<number | null>(null);
+  const [pinchStartZoom, setPinchStartZoom] = useState<number>(1);
+
+  const getTouchDistance = (t1: React.Touch | Touch, t2: React.Touch | Touch) => {
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  // Pan interaction across the entire canvas viewport (excluding cards and toolbars)
+  const isCanvasBackgroundTarget = (target: HTMLElement | null) => {
+    if (!target) return false;
+    if (target.closest('[data-floating-card]')) return false;
+    if (target.closest('[data-canvas-control]')) return false;
+    return true;
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only pan if clicking direct background or holding space
     const target = e.target as HTMLElement;
     if (
-      target.id === 'canvas-interactive-area' || 
-      target.id === 'canvas-svg-layer' ||
+      isCanvasBackgroundTarget(target) ||
       e.button === 1 || // Middle mouse
       e.shiftKey
     ) {
@@ -95,21 +109,24 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
-    if (
-      target.id === 'canvas-interactive-area' ||
-      target.id === 'canvas-svg-layer'
-    ) {
-      if (e.touches.length === 1) {
-        setIsPanning(true);
-        setStartPan({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
-      }
+    if (!isCanvasBackgroundTarget(target)) return;
+
+    if (e.touches.length === 1) {
+      setPinchStartDist(null);
+      setIsPanning(true);
+      setStartPan({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
+    } else if (e.touches.length === 2) {
+      setIsPanning(false);
+      setPinchStartDist(getTouchDistance(e.touches[0], e.touches[1]));
+      setPinchStartZoom(zoom);
     }
   };
 
   useEffect(() => {
-    if (!isPanning) return;
+    if (!isPanning && pinchStartDist === null) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanning) return;
       setPan({
         x: e.clientX - startPan.x,
         y: e.clientY - startPan.y,
@@ -117,21 +134,30 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
+      // Prevent browser pull-to-refresh or accidental page scroll while panning/zooming
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+      if (e.touches.length === 1 && isPanning) {
         setPan({
           x: e.touches[0].clientX - startPan.x,
           y: e.touches[0].clientY - startPan.y,
         });
+      } else if (e.touches.length === 2 && pinchStartDist) {
+        const currentDist = getTouchDistance(e.touches[0], e.touches[1]);
+        const scale = currentDist / pinchStartDist;
+        setZoom(Math.min(1.6, Math.max(0.6, Number((pinchStartZoom * scale).toFixed(2)))));
       }
     };
 
     const handleEnd = () => {
       setIsPanning(false);
+      setPinchStartDist(null);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleEnd);
-    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleEnd);
     window.addEventListener('touchcancel', handleEnd);
     return () => {
@@ -141,7 +167,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       window.removeEventListener('touchend', handleEnd);
       window.removeEventListener('touchcancel', handleEnd);
     };
-  }, [isPanning, startPan]);
+  }, [isPanning, startPan, pinchStartDist, pinchStartZoom]);
 
   // Bring card to front
   const handleBringToFront = (id: string) => {
@@ -178,10 +204,13 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="relative flex-1 h-full overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] bg-canvas-dots transition-colors select-none"
+      id="canvas-board-container"
+      onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
+      className={`relative flex-1 h-full overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] bg-canvas-dots transition-colors select-none touch-none overscroll-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
     >
       {/* Floating Toolbar on Canvas */}
-      <div className="absolute top-4 left-4 z-40 flex items-center gap-2">
+      <div data-canvas-control="true" className="absolute top-4 left-4 z-40 flex items-center gap-2">
         {/* Add Card Dropdown */}
         <div className="relative">
           <button
@@ -248,7 +277,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       </div>
 
       {/* Floating Canvas Zoom & View Controls (Bottom Right) */}
-      <div className="absolute bottom-4 right-4 z-40 flex items-center gap-1 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md rounded-xl p-1 border border-stone-200 dark:border-stone-800 shadow-lg text-xs">
+      <div data-canvas-control="true" className="absolute bottom-4 right-4 z-40 flex items-center gap-1 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md rounded-xl p-1 border border-stone-200 dark:border-stone-800 shadow-lg text-xs">
         <button
           onClick={handleZoomOut}
           className="p-1.5 text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white rounded-lg transition-colors cursor-pointer"
@@ -279,9 +308,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       {/* Interactive Transform Container */}
       <div
         id="canvas-interactive-area"
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-        className={`w-full h-full relative cursor-default ${isPanning ? 'cursor-grabbing' : ''}`}
+        className="w-full h-full relative"
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',

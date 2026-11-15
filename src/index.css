@@ -10,6 +10,10 @@
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
 
+  html, body {
+    overscroll-behavior: none;
+  }
+
   body {
     font-family: var(--font-sans);
     @apply bg-[#FBF9F5] text-stone-900 antialiased selection:bg-amber-200 selection:text-amber-950 dark:bg-[#0E1015] dark:text-stone-100 dark:selection:bg-amber-900/60 dark:selection:text-amber-100;
