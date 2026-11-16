@@ -14,6 +14,7 @@ import {
   Search,
   Users,
   Upload,
+  Save,
 } from 'lucide-react';
 import { SermonNote, SermonCategory, SERMON_CATEGORIES } from '../types';
 
@@ -33,9 +34,12 @@ interface HeaderProps {
   onUpdateSermonMeta: (updates: Partial<SermonNote>) => void;
   activeView: 'split' | 'canvas-only' | 'bible-only';
   onViewChange: (view: 'split' | 'canvas-only' | 'bible-only') => void;
+  hasUnsavedChanges?: boolean;
+  onManualSave?: () => void;
+  lastSavedAt?: number | null;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = React.memo(({
   sermon,
   isDarkMode,
   onToggleDarkMode,
@@ -51,6 +55,9 @@ export const Header: React.FC<HeaderProps> = ({
   onUpdateSermonMeta,
   activeView,
   onViewChange,
+  hasUnsavedChanges = false,
+  onManualSave,
+  lastSavedAt,
 }) => {
   const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [metaTitle, setMetaTitle] = useState(sermon.title);
@@ -70,19 +77,19 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="border-b border-stone-200 dark:border-stone-800 bg-[#FBF9F5]/90 dark:bg-[#12141A]/90 backdrop-blur-md sticky top-0 z-30 transition-colors">
-      {/* Strict One-Row Top Bar Contract (3 zones separated by gap-8) */}
-      <div className="flex items-center justify-between gap-8 px-4 sm:px-6 py-2.5">
+    <header className="border-b border-stone-200 dark:border-stone-800 bg-[#FBF9F5]/90 dark:bg-[#12141A]/90 backdrop-blur-md sticky top-0 z-30 transition-colors w-full">
+      {/* Adaptive Top Bar: 1 row on ultra-wide screens (2xl), 2 clean rows on laptops/tablets/mobile so every option is always visible */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-5 py-2">
         {/* Zone 1: Brand wordmark with official logo */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2">
             <img
               src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
               alt="Rhema Logo"
               className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs bg-white border border-stone-200/90 dark:border-stone-700/80 p-0.5 shrink-0"
             />
             <div className="flex flex-col">
-              <span className="text-lg sm:text-xl font-cinzel font-bold tracking-wider text-stone-900 dark:text-stone-100 leading-none">
+              <span className="text-base sm:text-xl font-cinzel font-bold tracking-wider text-stone-900 dark:text-stone-100 leading-none">
                 RHEMA
               </span>
               <span className="text-[10px] text-stone-500 dark:text-stone-400 font-sans tracking-widest leading-none mt-0.5">
@@ -90,26 +97,26 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
           </div>
-          <span className="hidden md:inline text-xs text-stone-400 dark:text-stone-500 font-serif italic border-l border-stone-300 dark:border-stone-700 pl-3">
+          <span className="hidden 2xl:inline text-xs text-stone-400 dark:text-stone-500 font-serif italic border-l border-stone-300 dark:border-stone-700 pl-3">
             Estudio & Lienzo de Prédicas
           </span>
         </div>
 
-        {/* Zone 2: Navigation Links (single-line, clean, unboxed) */}
-        <nav className="hidden lg:flex items-center gap-6 text-xs sm:text-sm font-medium text-stone-600 dark:text-stone-300">
+        {/* Zone 2: Navigation Links (Always accessible on all browsers/screens, wraps cleanly below header controls on < 2xl) */}
+        <nav className="order-3 w-full 2xl:order-none 2xl:w-auto flex flex-wrap items-center gap-x-3 sm:gap-x-5 gap-y-1.5 pt-2 2xl:pt-0 border-t 2xl:border-t-0 border-stone-200/80 dark:border-stone-800/80 text-xs sm:text-[13px] font-medium text-stone-600 dark:text-stone-300">
           <button
             onClick={onOpenSermonsList}
-            className="flex items-center gap-1.5 hover:text-amber-700 dark:hover:text-amber-400 transition-colors whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 hover:text-amber-700 dark:hover:text-amber-400 transition-colors whitespace-nowrap cursor-pointer py-0.5"
           >
-            <FolderOpen className="w-3.5 h-3.5 text-stone-400" />
+            <FolderOpen className="w-3.5 h-3.5 text-stone-400 shrink-0" />
             <span>Mis Prédicas</span>
           </button>
 
           <button
             onClick={onOpenReflections}
-            className="flex items-center gap-1.5 hover:text-amber-700 dark:hover:text-amber-400 transition-colors whitespace-nowrap cursor-pointer relative"
+            className="flex items-center gap-1.5 hover:text-amber-700 dark:hover:text-amber-400 transition-colors whitespace-nowrap cursor-pointer relative py-0.5"
           >
-            <HeartHandshake className="w-3.5 h-3.5 text-pink-500" />
+            <HeartHandshake className="w-3.5 h-3.5 text-pink-500 shrink-0" />
             <span>Diario Devocional</span>
             {sermon.reflection.godSpokeToMe && (
               <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse" />
@@ -118,10 +125,10 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={onOpenPresentationMode}
-            className="flex items-center gap-1.5 hover:text-amber-700 dark:hover:text-amber-400 transition-colors whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 hover:text-amber-700 dark:hover:text-amber-400 transition-colors whitespace-nowrap cursor-pointer py-0.5"
             title="Vista de pantalla completa para seguir la prédica"
           >
-            <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
+            <Maximize2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span>Modo Presentación</span>
           </button>
 
@@ -135,7 +142,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
               title={isCellMode ? 'Modo Célula activo (clic para volver a Biblia)' : 'Cambiar a Modo Célula (Lección PDF)'}
             >
-              <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
               <span>Modo Célula</span>
               {isCellMode && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -144,18 +151,18 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </nav>
 
-        {/* Zone 3: Primary Action & Quick Utilities */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Zone 3: Primary Action & Quick Utilities (Wraps safely on narrow screens) */}
+        <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 min-w-0">
           {/* Cargar Célula PDF button if in cell mode */}
           {isCellMode && onOpenCellPdfUpload && (
             <button
               onClick={onOpenCellPdfUpload}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-xs transition-colors cursor-pointer font-semibold"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-xs transition-colors cursor-pointer font-semibold whitespace-nowrap"
               title="Cargar o cambiar el archivo PDF de la lección semanal de célula"
             >
-              <Upload className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Cargar Célula (PDF)</span>
-              <span className="sm:hidden">Célula PDF</span>
+              <Upload className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden md:inline">Cargar Célula (PDF)</span>
+              <span className="md:hidden">PDF Célula</span>
             </button>
           )}
 
@@ -163,48 +170,51 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenQuickSearch && (
             <button
               onClick={onOpenQuickSearch}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white bg-stone-100 hover:bg-stone-200/70 dark:bg-stone-800 dark:hover:bg-stone-700/80 rounded-lg border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-xs text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-white bg-stone-100 hover:bg-stone-200/70 dark:bg-stone-800 dark:hover:bg-stone-700/80 rounded-lg border border-stone-200 dark:border-stone-700 transition-colors cursor-pointer whitespace-nowrap"
               title="Búsqueda rápida de pasajes bíblicos (Ctrl+K)"
             >
-              <Search className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <Search className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
               <span className="hidden sm:inline">Buscar</span>
-              <kbd className="hidden md:inline px-1 py-0.5 text-[9px] font-mono text-stone-400 bg-white dark:bg-stone-900 rounded border border-stone-300 dark:border-stone-700">
+              <kbd className="hidden lg:inline px-1 py-0.5 text-[9px] font-mono text-stone-400 bg-white dark:bg-stone-900 rounded border border-stone-300 dark:border-stone-700">
                 ⌘K
               </kbd>
             </button>
           )}
 
-          {/* View switcher on larger screens */}
+          {/* View switcher on tablet/desktop (mobile uses bottom bar) */}
           <div className="hidden sm:flex items-center p-0.5 bg-stone-200/70 dark:bg-stone-800 rounded-lg text-xs font-medium">
             <button
               onClick={() => onViewChange('split')}
-              className={`px-2.5 py-1 rounded-md transition-all whitespace-nowrap ${
+              className={`px-2 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer ${
                 activeView === 'split'
                   ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-xs'
                   : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
               }`}
             >
-              Lienzo & Biblia
+              <span className="hidden lg:inline">Lienzo & Biblia</span>
+              <span className="lg:hidden">Ambos</span>
             </button>
             <button
               onClick={() => onViewChange('canvas-only')}
-              className={`px-2.5 py-1 rounded-md transition-all whitespace-nowrap ${
+              className={`px-2 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer ${
                 activeView === 'canvas-only'
                   ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-xs'
                   : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
               }`}
             >
-              Sólo Lienzo
+              <span className="hidden lg:inline">Sólo Lienzo</span>
+              <span className="lg:hidden">Lienzo</span>
             </button>
             <button
               onClick={() => onViewChange('bible-only')}
-              className={`px-2.5 py-1 rounded-md transition-all whitespace-nowrap ${
+              className={`px-2 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer ${
                 activeView === 'bible-only'
                   ? 'bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-xs'
                   : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
               }`}
             >
-              Sólo Biblia
+              <span className="hidden lg:inline">Sólo Biblia</span>
+              <span className="lg:hidden">Biblia</span>
             </button>
           </div>
 
@@ -228,13 +238,48 @@ export const Header: React.FC<HeaderProps> = ({
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-stone-600" />}
           </button>
 
+          {/* Manual Save Button */}
+          {onManualSave && (
+            <button
+              type="button"
+              onClick={onManualSave}
+              disabled={!hasUnsavedChanges}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                hasUnsavedChanges
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm cursor-pointer ring-1 ring-emerald-500/40'
+                  : 'bg-stone-100 dark:bg-stone-800/70 text-stone-400 dark:text-stone-500 border border-stone-200 dark:border-stone-700/70 cursor-default'
+              }`}
+              title={
+                hasUnsavedChanges
+                  ? 'Guardar cambios pendientes ahora (Ctrl+S)'
+                  : lastSavedAt
+                  ? `Todo guardado (${new Date(lastSavedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })})`
+                  : 'Sin cambios pendientes'
+              }
+            >
+              {hasUnsavedChanges ? (
+                <>
+                  <Save className="w-3.5 h-3.5 shrink-0" />
+                  <span>Guardar</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" />
+                </>
+              ) : (
+                <>
+                  <Check className="w-3.5 h-3.5 shrink-0 text-emerald-500 dark:text-emerald-400" />
+                  <span className="hidden sm:inline">Guardado</span>
+                </>
+              )}
+            </button>
+          )}
+
           {/* Primary Action Button: Export */}
           <button
             onClick={onOpenExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-amber-700 hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-700 rounded-lg shadow-sm transition-colors whitespace-nowrap cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-white bg-amber-700 hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-700 rounded-lg shadow-sm transition-colors whitespace-nowrap cursor-pointer"
           >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Exportar Resumen</span>
+            <Share2 className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Exportar Resumen</span>
+            <span className="sm:hidden">Exportar</span>
           </button>
         </div>
       </div>
@@ -354,4 +399,4 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
     </header>
   );
-};
+});

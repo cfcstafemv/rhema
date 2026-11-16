@@ -26,6 +26,7 @@ interface FloatingCardItemProps {
   zoomScale: number;
   typeLabels?: Record<CardType, string>;
   onOpenEditDefaults?: () => void;
+  onDirty?: () => void;
 }
 
 const COLOR_OPTIONS = [
@@ -38,7 +39,7 @@ const COLOR_OPTIONS = [
   '#78716C', // Stone
 ];
 
-export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
+export const FloatingCardItem: React.FC<FloatingCardItemProps> = React.memo(({
   card,
   onUpdate,
   onDelete,
@@ -47,13 +48,32 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
   zoomScale,
   typeLabels,
   onOpenEditDefaults,
+  onDirty,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isEditingTag, setIsEditingTag] = useState(false);
+  const [localTitle, setLocalTitle] = useState(card.title);
+  const [localContent, setLocalContent] = useState(card.content);
   const cardRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // Refs for GPU-accelerated dragging without React re-renders per pixel
+  const dragOriginRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    cardStartX: number;
+    cardStartY: number;
+    dx: number;
+    dy: number;
+  } | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+
+  // Refs for debounced text updates
+  const titleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestTitleRef = useRef(card.title);
+  const latestContentRef = useRef(card.content);
 
   const cardTypeInfo = CARD_TYPES.find((t) => t.id === card.type) || CARD_TYPES[0];
   const [tagInput, setTagInput] = useState(
@@ -66,13 +86,68 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
     );
   }, [card.customTypeLabel, card.tags, card.type, typeLabels, cardTypeInfo.label]);
 
+  useEffect(() => {
+    setLocalTitle(card.title);
+    latestTitleRef.current = card.title;
+  }, [card.id, card.title]);
+
+  useEffect(() => {
+    setLocalContent(card.content);
+    latestContentRef.current = card.content;
+  }, [card.id, card.content]);
+
+  useEffect(() => {
+    return () => {
+      if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+      if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+    };
+  }, []);
+
+  const handleTitleChange = (val: string) => {
+    setLocalTitle(val);
+    latestTitleRef.current = val;
+    onDirty?.();
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = setTimeout(() => {
+      titleTimerRef.current = null;
+      onUpdate(card.id, { title: val });
+    }, 250);
+  };
+
+  const handleTitleBlur = () => {
+    if (titleTimerRef.current) {
+      clearTimeout(titleTimerRef.current);
+      titleTimerRef.current = null;
+      onUpdate(card.id, { title: latestTitleRef.current });
+    }
+  };
+
+  const handleContentChange = (val: string) => {
+    setLocalContent(val);
+    latestContentRef.current = val;
+    onDirty?.();
+    if (contentTimerRef.current) clearTimeout(contentTimerRef.current);
+    contentTimerRef.current = setTimeout(() => {
+      contentTimerRef.current = null;
+      onUpdate(card.id, { content: val });
+    }, 250);
+  };
+
+  const handleContentBlur = () => {
+    if (contentTimerRef.current) {
+      clearTimeout(contentTimerRef.current);
+      contentTimerRef.current = null;
+      onUpdate(card.id, { content: latestContentRef.current });
+    }
+  };
+
   // Dragging logic - Mouse
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only drag from the card header or drag handle, not from input/textarea
     const target = e.target as HTMLElement;
     if (
-      target.tagName === 'INPUT' || 
-      target.tagName === 'TEXTAREA' || 
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
       target.tagName === 'BUTTON' ||
       target.closest('button') ||
       target.closest('.no-drag')
@@ -82,21 +157,23 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
     }
 
     onBringToFront(card.id);
+    dragOriginRef.current = {
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      cardStartX: card.x,
+      cardStartY: card.y,
+      dx: 0,
+      dy: 0,
+    };
     setIsDragging(true);
-
-    // Record initial offset relative to card
-    setDragOffset({
-      x: e.clientX / zoomScale - card.x,
-      y: e.clientY / zoomScale - card.y,
-    });
   };
 
   // Dragging logic - Touch (Tablet & Phone)
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
     if (
-      target.tagName === 'INPUT' || 
-      target.tagName === 'TEXTAREA' || 
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
       target.tagName === 'BUTTON' ||
       target.closest('button') ||
       target.closest('.no-drag')
@@ -108,24 +185,41 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       onBringToFront(card.id);
+      dragOriginRef.current = {
+        startClientX: touch.clientX,
+        startClientY: touch.clientY,
+        cardStartX: card.x,
+        cardStartY: card.y,
+        dx: 0,
+        dy: 0,
+      };
       setIsDragging(true);
-      setDragOffset({
-        x: touch.clientX / zoomScale - card.x,
-        y: touch.clientY / zoomScale - card.y,
-      });
     }
   };
 
   useEffect(() => {
     if (!isDragging) return;
 
+    const scheduleTransform = (clientX: number, clientY: number) => {
+      const origin = dragOriginRef.current;
+      if (!origin) return;
+      const rawDx = (clientX - origin.startClientX) / zoomScale;
+      const rawDy = (clientY - origin.startClientY) / zoomScale;
+      origin.dx = Math.max(10 - origin.cardStartX, Math.round(rawDx));
+      origin.dy = Math.max(10 - origin.cardStartY, Math.round(rawDy));
+
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          if (cardRef.current && dragOriginRef.current) {
+            cardRef.current.style.transform = `translate3d(${dragOriginRef.current.dx}px, ${dragOriginRef.current.dy}px, 0)`;
+          }
+        });
+      }
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
-      const newX = Math.round(e.clientX / zoomScale - dragOffset.x);
-      const newY = Math.round(e.clientY / zoomScale - dragOffset.y);
-      onUpdate(card.id, {
-        x: Math.max(10, newX),
-        y: Math.max(10, newY),
-      });
+      scheduleTransform(e.clientX, e.clientY);
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -133,18 +227,28 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
         e.preventDefault();
       }
       if (e.touches.length === 1) {
-        const touch = e.touches[0];
-        const newX = Math.round(touch.clientX / zoomScale - dragOffset.x);
-        const newY = Math.round(touch.clientY / zoomScale - dragOffset.y);
-        onUpdate(card.id, {
-          x: Math.max(10, newX),
-          y: Math.max(10, newY),
-        });
+        scheduleTransform(e.touches[0].clientX, e.touches[0].clientY);
       }
     };
 
     const handleEnd = () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      if (cardRef.current) {
+        cardRef.current.style.transform = '';
+      }
+      const origin = dragOriginRef.current;
+      dragOriginRef.current = null;
       setIsDragging(false);
+
+      if (origin && (origin.dx !== 0 || origin.dy !== 0)) {
+        onUpdate(card.id, {
+          x: Math.max(10, origin.cardStartX + origin.dx),
+          y: Math.max(10, origin.cardStartY + origin.dy),
+        });
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -159,7 +263,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
       window.removeEventListener('touchend', handleEnd);
       window.removeEventListener('touchcancel', handleEnd);
     };
-  }, [isDragging, dragOffset, zoomScale, card.id, onUpdate]);
+  }, [isDragging, zoomScale, card.id, onUpdate]);
 
   // Render icon for card type
   const renderTypeIcon = () => {
@@ -197,6 +301,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
         boxSizing: 'border-box',
         zIndex: card.zIndex || 1,
         borderColor: `${card.color}40`,
+        willChange: isDragging ? 'transform' : undefined,
       }}
     >
       {/* Visual Accent Top Bar */}
@@ -341,8 +446,9 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
             <input
               ref={titleInputRef}
               type="text"
-              value={card.title}
-              onChange={(e) => onUpdate(card.id, { title: e.target.value })}
+              value={localTitle}
+              onChange={(e) => handleTitleChange(e.target.value)}
+              onBlur={handleTitleBlur}
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
               placeholder="Título del punto o mensaje..."
@@ -363,8 +469,9 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
 
         {/* Content Note Textarea */}
         <textarea
-          value={card.content}
-          onChange={(e) => onUpdate(card.id, { content: e.target.value })}
+          value={localContent}
+          onChange={(e) => handleContentChange(e.target.value)}
+          onBlur={handleContentBlur}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
           placeholder="Escribe las notas, argumentos del pastor, preguntas o citas..."
@@ -372,8 +479,8 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
             10,
             Math.max(
               3,
-              Math.ceil((card.content?.length || 0) / 42) +
-                ((card.content?.match(/\n/g) || []).length)
+              Math.ceil((localContent?.length || 0) / 42) +
+                ((localContent?.match(/\n/g) || []).length)
             )
           )}
           className="w-full text-xs font-sans bg-transparent border-0 resize-none focus:outline-none text-stone-700 dark:text-stone-300 placeholder:text-stone-400/70 p-0 leading-relaxed"
@@ -433,8 +540,9 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
         >
           <input
             type="text"
-            value={card.title}
-            onChange={(e) => onUpdate(card.id, { title: e.target.value })}
+            value={localTitle}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            onBlur={handleTitleBlur}
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             placeholder="Título de la tarjeta..."
@@ -446,4 +554,4 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = ({
       )}
     </div>
   );
-};
+});

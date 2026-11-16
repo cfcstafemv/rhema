@@ -17,7 +17,15 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import { CellLessonData, FloatingCard } from '../types';
-import { fixPdfLigatures } from '../services/pdfService';
+
+function fixPdfLigatures(str: string): string {
+  return str
+    .replace(/\u019f/g, 'ti')
+    .replace(/\u01a1/g, 'tí')
+    .replace(/\u0130/g, 'fl')
+    .replace(/\ufb01/g, 'fi')
+    .replace(/\ufb02/g, 'fl');
+}
 
 interface CellLessonReaderProps {
   cellLesson?: CellLessonData;
@@ -28,7 +36,7 @@ interface CellLessonReaderProps {
   cards: FloatingCard[];
 }
 
-export const CellLessonReader: React.FC<CellLessonReaderProps> = ({
+export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
   cellLesson,
   onOpenUploadModal,
   onSwitchToSermonMode,
@@ -442,4 +450,4 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = ({
       </div>
     </div>
   );
-};
+});

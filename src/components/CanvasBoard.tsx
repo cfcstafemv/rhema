@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   ZoomIn, 
@@ -27,17 +27,21 @@ interface CanvasBoardProps {
   highlights: VerseHighlight[];
   onApplyTemplate?: (cards: FloatingCard[], mode: 'replace' | 'append') => void;
   onUpdateCard: (id: string, updates: Partial<FloatingCard>) => void;
+  onBatchUpdateCards?: (updates: Array<{ id: string; updates: Partial<FloatingCard> }>) => void;
+  onCardDirty?: () => void;
   onDeleteCard: (id: string) => void;
   onAddCard: (cardType: CardType) => void;
   onNavigateToLinkedVerse?: (verseRef: string) => void;
   isSplitView: boolean;
 }
 
-export const CanvasBoard: React.FC<CanvasBoardProps> = ({
+export const CanvasBoard: React.FC<CanvasBoardProps> = React.memo(({
   cards,
   links,
   highlights,
   onUpdateCard,
+  onBatchUpdateCards,
+  onCardDirty,
   onDeleteCard,
   onAddCard,
   onNavigateToLinkedVerse,
@@ -47,13 +51,43 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [startPan, setStartPan] = useState({ x: 0, y: 0 });
+  const [isPinching, setIsPinching] = useState(false);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false);
   const [typeLabels, setTypeLabels] = useState<Record<CardType, string>>(getCustomCardTypeLabels());
   const [isEditCardTypesOpen, setIsEditCardTypesOpen] = useState(false);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 1200, height: 800 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const interactiveAreaRef = useRef<HTMLDivElement>(null);
+
+  // Refs for GPU-composited pan & zoom without per-frame React re-renders
+  const latestPanRef = useRef(pan);
+  const latestZoomRef = useRef(zoom);
+  const cardsRef = useRef(cards);
+  latestPanRef.current = pan;
+  latestZoomRef.current = zoom;
+  cardsRef.current = cards;
+
+  const panStateRef = useRef<{
+    startClientX: number;
+    startClientY: number;
+    originX: number;
+    originY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
+  const pinchStateRef = useRef<{
+    startDist: number;
+    startZoom: number;
+    currentZoom: number;
+  } | null>(null);
+  const panRafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (panRafRef.current !== null) cancelAnimationFrame(panRafRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -78,9 +112,6 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     return () => window.removeEventListener('resize', updateDimensions);
   }, []);
 
-  const [pinchStartDist, setPinchStartDist] = useState<number | null>(null);
-  const [pinchStartZoom, setPinchStartZoom] = useState<number>(1);
-
   const getTouchDistance = (t1: React.Touch | Touch, t2: React.Touch | Touch) => {
     const dx = t1.clientX - t2.clientX;
     const dy = t1.clientY - t2.clientY;
@@ -102,8 +133,15 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       e.button === 1 || // Middle mouse
       e.shiftKey
     ) {
+      panStateRef.current = {
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        originX: latestPanRef.current.x,
+        originY: latestPanRef.current.y,
+        currentX: latestPanRef.current.x,
+        currentY: latestPanRef.current.y,
+      };
       setIsPanning(true);
-      setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     }
   };
 
@@ -112,47 +150,88 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     if (!isCanvasBackgroundTarget(target)) return;
 
     if (e.touches.length === 1) {
-      setPinchStartDist(null);
+      pinchStateRef.current = null;
+      setIsPinching(false);
+      panStateRef.current = {
+        startClientX: e.touches[0].clientX,
+        startClientY: e.touches[0].clientY,
+        originX: latestPanRef.current.x,
+        originY: latestPanRef.current.y,
+        currentX: latestPanRef.current.x,
+        currentY: latestPanRef.current.y,
+      };
       setIsPanning(true);
-      setStartPan({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
     } else if (e.touches.length === 2) {
+      panStateRef.current = null;
       setIsPanning(false);
-      setPinchStartDist(getTouchDistance(e.touches[0], e.touches[1]));
-      setPinchStartZoom(zoom);
+      pinchStateRef.current = {
+        startDist: getTouchDistance(e.touches[0], e.touches[1]),
+        startZoom: latestZoomRef.current,
+        currentZoom: latestZoomRef.current,
+      };
+      setIsPinching(true);
     }
   };
 
   useEffect(() => {
-    if (!isPanning && pinchStartDist === null) return;
+    if (!isPanning && !isPinching) return;
+
+    const scheduleAreaTransform = (x: number, y: number, z: number) => {
+      if (panRafRef.current === null) {
+        panRafRef.current = requestAnimationFrame(() => {
+          panRafRef.current = null;
+          if (interactiveAreaRef.current) {
+            interactiveAreaRef.current.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${z})`;
+          }
+        });
+      }
+    };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isPanning) return;
-      setPan({
-        x: e.clientX - startPan.x,
-        y: e.clientY - startPan.y,
-      });
+      if (!isPanning || !panStateRef.current) return;
+      const nextX = panStateRef.current.originX + (e.clientX - panStateRef.current.startClientX);
+      const nextY = panStateRef.current.originY + (e.clientY - panStateRef.current.startClientY);
+      panStateRef.current.currentX = nextX;
+      panStateRef.current.currentY = nextY;
+      scheduleAreaTransform(nextX, nextY, latestZoomRef.current);
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      // Prevent browser pull-to-refresh or accidental page scroll while panning/zooming
       if (e.cancelable) {
         e.preventDefault();
       }
-      if (e.touches.length === 1 && isPanning) {
-        setPan({
-          x: e.touches[0].clientX - startPan.x,
-          y: e.touches[0].clientY - startPan.y,
-        });
-      } else if (e.touches.length === 2 && pinchStartDist) {
+      if (e.touches.length === 1 && isPanning && panStateRef.current) {
+        const nextX = panStateRef.current.originX + (e.touches[0].clientX - panStateRef.current.startClientX);
+        const nextY = panStateRef.current.originY + (e.touches[0].clientY - panStateRef.current.startClientY);
+        panStateRef.current.currentX = nextX;
+        panStateRef.current.currentY = nextY;
+        scheduleAreaTransform(nextX, nextY, latestZoomRef.current);
+      } else if (e.touches.length === 2 && pinchStateRef.current) {
         const currentDist = getTouchDistance(e.touches[0], e.touches[1]);
-        const scale = currentDist / pinchStartDist;
-        setZoom(Math.min(1.6, Math.max(0.6, Number((pinchStartZoom * scale).toFixed(2)))));
+        const scale = currentDist / Math.max(1, pinchStateRef.current.startDist);
+        const nextZoom = Math.min(1.6, Math.max(0.6, Number((pinchStateRef.current.startZoom * scale).toFixed(2))));
+        pinchStateRef.current.currentZoom = nextZoom;
+        scheduleAreaTransform(latestPanRef.current.x, latestPanRef.current.y, nextZoom);
       }
     };
 
     const handleEnd = () => {
+      if (panRafRef.current !== null) {
+        cancelAnimationFrame(panRafRef.current);
+        panRafRef.current = null;
+      }
+      if (panStateRef.current) {
+        const { currentX, currentY } = panStateRef.current;
+        panStateRef.current = null;
+        setPan({ x: currentX, y: currentY });
+      }
+      if (pinchStateRef.current) {
+        const { currentZoom } = pinchStateRef.current;
+        pinchStateRef.current = null;
+        setZoom(currentZoom);
+      }
       setIsPanning(false);
-      setPinchStartDist(null);
+      setIsPinching(false);
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -167,15 +246,22 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       window.removeEventListener('touchend', handleEnd);
       window.removeEventListener('touchcancel', handleEnd);
     };
-  }, [isPanning, startPan, pinchStartDist, pinchStartZoom]);
+  }, [isPanning, isPinching]);
 
   // Bring card to front
-  const handleBringToFront = (id: string) => {
-    const maxZ = Math.max(...cards.map((c) => c.zIndex || 1), 1);
+  const handleBringToFront = useCallback((id: string) => {
+    const currentCards = cardsRef.current;
+    const target = currentCards.find((c) => c.id === id);
+    const maxZ = Math.max(...currentCards.map((c) => c.zIndex || 1), 1);
+    if (target && (target.zIndex || 1) >= maxZ) return;
     onUpdateCard(id, { zIndex: maxZ + 1 });
-  };
+  }, [onUpdateCard]);
 
-  // Auto-arrange cards in an orderly staggered grid
+  const handleOpenEditDefaults = useCallback(() => {
+    setIsEditCardTypesOpen(true);
+  }, []);
+
+  // Auto-arrange cards in an orderly staggered grid (single batch update)
   const handleAutoArrange = () => {
     const startX = 40;
     const startY = 40;
@@ -183,14 +269,23 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
     const rowHeight = 260;
     const cols = Math.max(1, Math.floor((canvasDimensions.width - 80) / colWidth));
 
-    cards.forEach((card, idx) => {
+    const batch = cards.map((card, idx) => {
       const col = idx % cols;
       const row = Math.floor(idx / cols);
-      onUpdateCard(card.id, {
-        x: startX + col * colWidth,
-        y: startY + row * rowHeight,
-      });
+      return {
+        id: card.id,
+        updates: {
+          x: startX + col * colWidth,
+          y: startY + row * rowHeight,
+        },
+      };
     });
+
+    if (onBatchUpdateCards) {
+      onBatchUpdateCards(batch);
+    } else {
+      batch.forEach((b) => onUpdateCard(b.id, b.updates));
+    }
   };
 
   // Zoom helpers
@@ -307,11 +402,13 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
       {/* Interactive Transform Container */}
       <div
+        ref={interactiveAreaRef}
         id="canvas-interactive-area"
         className="w-full h-full relative"
         style={{
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+          transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
           transformOrigin: '0 0',
+          willChange: 'transform',
         }}
       >
         {/* SVG Dynamic Connection Cords Layer */}
@@ -337,25 +434,18 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
               <stop offset="0%" stopColor="#10B981" stopOpacity="0.85" />
               <stop offset="100%" stopColor="#10B981" stopOpacity="0.4" />
             </linearGradient>
-            <filter id="glow-shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.25" />
-            </filter>
           </defs>
 
           {/* Render connection cords between cards and biblical anchors */}
-          {cards.map((card, i) => {
+          {cards.map((card) => {
             if (!card.linkedVerseRef) return null;
 
-            // Anchor point on the left edge of canvas (where Bible reader connects in split view)
-            // Stagger anchor Y based on index for harmonic lines
             const anchorX = 0;
             const anchorY = Math.max(40, card.y + 40);
 
-            // Target point on the card's left connection dock
             const targetX = card.x;
             const targetY = card.y + 24;
 
-            // Compute smooth horizontal S-curve Bézier control points
             const deltaX = Math.abs(targetX - anchorX);
             const cp1X = anchorX + Math.max(60, deltaX * 0.45);
             const cp1Y = anchorY;
@@ -366,7 +456,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
 
             return (
               <g key={`cord-${card.id}`}>
-                {/* Background glow halo */}
+                {/* Background halo */}
                 <path
                   d={pathD}
                   fill="none"
@@ -375,7 +465,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
                   strokeOpacity="0.12"
                 />
 
-                {/* Primary dynamic cable */}
+                {/* Primary dynamic cable (lightweight GPU-friendly stroke) */}
                 <path
                   d={pathD}
                   fill="none"
@@ -383,8 +473,6 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
                   strokeWidth="2.2"
                   strokeDasharray="5 3"
                   strokeOpacity="0.85"
-                  filter="url(#glow-shadow)"
-                  className="animate-pulse"
                 />
 
                 {/* Anchor origin dot */}
@@ -408,7 +496,8 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
             onNavigateToLinkedVerse={onNavigateToLinkedVerse}
             zoomScale={zoom}
             typeLabels={typeLabels}
-            onOpenEditDefaults={() => setIsEditCardTypesOpen(true)}
+            onOpenEditDefaults={handleOpenEditDefaults}
+            onDirty={onCardDirty}
           />
         ))}
 
@@ -456,4 +545,4 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = ({
       )}
     </div>
   );
-};
+});

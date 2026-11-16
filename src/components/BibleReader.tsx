@@ -109,7 +109,7 @@ interface BibleReaderProps {
   onToggleCollapse?: () => void;
 }
 
-export const BibleReader: React.FC<BibleReaderProps> = ({
+export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
   activeBookId,
   activeChapter,
   highlights,
@@ -1874,7 +1874,7 @@ export const BibleReader: React.FC<BibleReaderProps> = ({
       />
     </div>
   );
-};
+});
 
 function renderHighlightedString(
   text: string,
