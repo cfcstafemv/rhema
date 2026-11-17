@@ -20,6 +20,7 @@ import { CARD_TYPES } from '../data/bibleData';
 import { getCustomCardTypeLabels } from '../services/storage';
 import { EditCardTypesModal } from './EditCardTypesModal';
 import { SermonTemplatesModal } from './SermonTemplatesModal';
+import { arrangeCardsInZones } from '../utils/canvasZones';
 
 interface CanvasBoardProps {
   cards: FloatingCard[];
@@ -33,6 +34,7 @@ interface CanvasBoardProps {
   onAddCard: (cardType: CardType) => void;
   onNavigateToLinkedVerse?: (verseRef: string) => void;
   isSplitView: boolean;
+  isCellMode?: boolean;
 }
 
 export const CanvasBoard: React.FC<CanvasBoardProps> = React.memo(({
@@ -47,6 +49,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = React.memo(({
   onNavigateToLinkedVerse,
   onApplyTemplate,
   isSplitView,
+  isCellMode = false,
 }) => {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -261,25 +264,21 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = React.memo(({
     setIsEditCardTypesOpen(true);
   }, []);
 
-  // Auto-arrange cards in an orderly staggered grid (single batch update)
+  // Auto-arrange cards into 3 invisible semantic zone columns (single batch update)
   const handleAutoArrange = () => {
-    const startX = 40;
-    const startY = 40;
-    const colWidth = 350;
-    const rowHeight = 260;
-    const cols = Math.max(1, Math.floor((canvasDimensions.width - 80) / colWidth));
-
-    const batch = cards.map((card, idx) => {
-      const col = idx % cols;
-      const row = Math.floor(idx / cols);
-      return {
-        id: card.id,
-        updates: {
-          x: startX + col * colWidth,
-          y: startY + row * rowHeight,
-        },
-      };
+    const measuredHeights: Record<string, number> = {};
+    cards.forEach((card) => {
+      const el = document.getElementById(`floating-card-${card.id}`);
+      if (el && el.offsetHeight > 0) {
+        measuredHeights[card.id] = el.offsetHeight;
+      }
     });
+
+    const arranged = arrangeCardsInZones(cards, isCellMode, measuredHeights);
+    const batch = arranged.map(({ id, x, y }) => ({
+      id,
+      updates: { x, y },
+    }));
 
     if (onBatchUpdateCards) {
       onBatchUpdateCards(batch);
@@ -352,7 +351,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = React.memo(({
         <button
           onClick={handleAutoArrange}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/80 dark:bg-stone-900/80 backdrop-blur-md hover:bg-white dark:hover:bg-stone-900 text-stone-700 dark:text-stone-300 border border-stone-200 dark:border-stone-800 shadow-sm text-xs font-medium transition-colors cursor-pointer"
-          title="Organizar tarjetas en cuadrícula armónica"
+          title="Acomodar tarjetas en las 3 columnas por categoría"
         >
           <Grid className="w-3.5 h-3.5 text-stone-500" />
           <span className="hidden sm:inline">Acomodar</span>

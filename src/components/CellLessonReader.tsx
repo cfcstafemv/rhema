@@ -27,12 +27,133 @@ function fixPdfLigatures(str: string): string {
     .replace(/\ufb02/g, 'fl');
 }
 
+const isDefaultQuestionPrompt = (val?: string): boolean => {
+  const trimmed = (val || '').replace(/\r/g, '').trim();
+  return (
+    trimmed === '💬 Respuestas y aportes del grupo:\n•' ||
+    trimmed === '💬 Respuestas y aportes del grupo:'
+  );
+};
+
+interface EditableCellQuestionItemProps {
+  idx: number;
+  questionText: string;
+  matchingCard?: FloatingCard;
+  onUpdateCard?: (id: string, updates: Partial<FloatingCard>) => void;
+  onCreateQuestionCard?: (idx: number, questionTitle: string, content: string) => void;
+  onDirty?: () => void;
+}
+
+const EditableCellQuestionItem: React.FC<EditableCellQuestionItemProps> = ({
+  idx,
+  questionText,
+  matchingCard,
+  onUpdateCard,
+  onCreateQuestionCard,
+  onDirty,
+}) => {
+  const rawIncoming = matchingCard ? matchingCard.content : '';
+  const initialContent = isDefaultQuestionPrompt(rawIncoming) ? '' : rawIncoming;
+  const [localContent, setLocalContent] = useState(initialContent);
+  const latestContentRef = React.useRef(initialContent);
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    const raw = matchingCard ? matchingCard.content : '';
+    const incoming = isDefaultQuestionPrompt(raw) ? '' : raw;
+    if (!timerRef.current && incoming !== latestContentRef.current) {
+      setLocalContent(incoming);
+      latestContentRef.current = incoming;
+    }
+  }, [matchingCard?.id, matchingCard?.content]);
+
+  React.useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const commitChange = (val: string) => {
+    if (matchingCard && onUpdateCard) {
+      onUpdateCard(matchingCard.id, { content: val });
+    } else if (!matchingCard && onCreateQuestionCard) {
+      onCreateQuestionCard(idx, fixPdfLigatures(questionText), val);
+    }
+  };
+
+  const handleFocus = () => {
+    if (matchingCard && isDefaultQuestionPrompt(matchingCard.content)) {
+      setLocalContent('');
+      latestContentRef.current = '';
+      onUpdateCard?.(matchingCard.id, { content: '' });
+    }
+  };
+
+  const handleChange = (val: string) => {
+    setLocalContent(val);
+    latestContentRef.current = val;
+    onDirty?.();
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      commitChange(val);
+    }, 150);
+  };
+
+  const handleBlur = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+      commitChange(latestContentRef.current);
+    }
+  };
+
+  const displayQuestion =
+    matchingCard && !/^Pregunta\s+\d+$/i.test(matchingCard.title.trim())
+      ? matchingCard.title
+      : fixPdfLigatures(questionText);
+
+  const lineCount = Math.min(
+    10,
+    Math.max(
+      3,
+      Math.ceil((localContent?.length || 0) / 44) + ((localContent?.match(/\n/g) || []).length)
+    )
+  );
+
+  return (
+    <div className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs space-y-2 transition-colors focus-within:border-emerald-500/70">
+      <div className="flex items-start gap-2 min-w-0">
+        <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+          {idx + 1}
+        </span>
+        <h4 className="font-sans font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100 leading-snug break-words">
+          {displayQuestion}
+        </h4>
+      </div>
+
+      <textarea
+        value={localContent}
+        onFocus={handleFocus}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={handleBlur}
+        rows={lineCount}
+        placeholder="💬 Respuestas y aportes del grupo..."
+        className="w-full p-2.5 rounded-lg bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 focus:outline-hidden text-xs text-stone-800 dark:text-stone-200 placeholder:text-stone-400 font-sans leading-relaxed resize-y transition-colors"
+      />
+    </div>
+  );
+};
+
 interface CellLessonReaderProps {
   cellLesson?: CellLessonData;
   onOpenUploadModal: () => void;
   onSwitchToSermonMode: () => void;
   onSelectPassageInBible?: (bookId: string, chapter: number) => void;
   onFocusCardOnCanvas?: (cardId: string) => void;
+  onUpdateCard?: (id: string, updates: Partial<FloatingCard>) => void;
+  onCreateQuestionCard?: (idx: number, questionTitle: string, content: string) => void;
+  onDirty?: () => void;
   cards: FloatingCard[];
 }
 
@@ -42,6 +163,9 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
   onSwitchToSermonMode,
   onSelectPassageInBible,
   onFocusCardOnCanvas,
+  onUpdateCard,
+  onCreateQuestionCard,
+  onDirty,
   cards,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -288,29 +412,40 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
                 Preguntas de diálogo en grupo ({cellLesson.detectedQuestions.length}):
               </span>
               <span>
-                Tienen tarjeta dedicada en el lienzo para que anotes las respuestas del grupo durante la reunión.
+                Escribe las respuestas aquí o directamente en la tarjeta del lienzo: se actualizan automáticamente en ambos lugares.
               </span>
             </div>
 
-            <div className="space-y-2">
-              {cellLesson.detectedQuestions.map((q, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs space-y-1.5"
-                >
-                  <div className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                      {idx + 1}
-                    </span>
-                    <h4 className="font-sans font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100 leading-snug">
-                      {q}
-                    </h4>
-                  </div>
-                  <div className="p-1.5 rounded bg-stone-50 dark:bg-stone-800/50 text-[11px] text-stone-500 font-sans italic">
-                    ✏️ Las respuestas de los miembros se guardan en la tarjeta correspondiente del lienzo.
-                  </div>
-                </div>
-              ))}
+            <div className="space-y-2.5">
+              {cellLesson.detectedQuestions
+                .map((q, idx) => ({ q, idx }))
+                .filter(({ q }) =>
+                  !searchQuery.trim() ||
+                  fixPdfLigatures(q).toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map(({ q, idx }) => {
+                  const cleanQ = fixPdfLigatures(q).trim();
+                  const matchingCard =
+                    cards.find((c) => /^card-cell-q-.*-\d+$/.test(c.id) && c.id.endsWith(`-${idx}`)) ||
+                    cards.find(
+                      (c) =>
+                        (c.customTypeLabel === 'Pregunta de Diálogo' ||
+                          c.tags?.includes('Pregunta de Diálogo')) &&
+                        (c.title.trim() === cleanQ || c.title.trim() === q.trim() || c.content.includes(q.trim()))
+                    );
+
+                  return (
+                    <EditableCellQuestionItem
+                      key={idx}
+                      idx={idx}
+                      questionText={q}
+                      matchingCard={matchingCard}
+                      onUpdateCard={onUpdateCard}
+                      onCreateQuestionCard={onCreateQuestionCard}
+                      onDirty={onDirty}
+                    />
+                  );
+                })}
             </div>
           </div>
         )}

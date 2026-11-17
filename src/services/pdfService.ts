@@ -2,6 +2,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { FloatingCard, ConnectionLink } from '../types';
 import { getBibleVerses } from '../data/bibleData';
 import { getOrFetchChapterVerses, LOCAL_TO_API_BOOK_MAP } from './bibleService';
+import { arrangeCardsInZones } from '../utils/canvasZones';
 
 // Configure pdfjs worker
 if (typeof window !== 'undefined') {
@@ -593,6 +594,7 @@ export async function parseCellLesson(text: string, fileName?: string): Promise<
       title: `Cita Bíblica: ${sc.ref}`,
       content: fullTextQuote,
       color: '#3B82F6',
+      isMinimized: true,
       linkedVerseRef: sc.ref,
       linkedQuote: sc.sampleText,
       x: pos.x,
@@ -622,7 +624,7 @@ export async function parseCellLesson(text: string, fileName?: string): Promise<
       customTypeLabel: 'Pregunta de Diálogo',
       tags: ['Pregunta de Diálogo'],
       title: q,
-      content: `💬 Respuestas y aportes del grupo:\n• `,
+      content: '',
       color: '#10B981',
       x: pos.x,
       y: pos.y,
@@ -660,6 +662,13 @@ export async function parseCellLesson(text: string, fileName?: string): Promise<
     createdAt: now + cardIndex,
   });
 
+  const arrangedPositions = arrangeCardsInZones(cards, true);
+  const positionById = new Map(arrangedPositions.map((p) => [p.id, p]));
+  const positionedCards = cards.map((card) => {
+    const pos = positionById.get(card.id);
+    return pos ? { ...card, x: pos.x, y: pos.y } : card;
+  });
+
   return {
     lessonTitle: detectedTitle,
     lessonNumber: detectedLessonNumber || undefined,
@@ -669,7 +678,7 @@ export async function parseCellLesson(text: string, fileName?: string): Promise<
     icebreaker: icebreaker || undefined,
     detectedScriptures: detectedScriptures.map(({ firstIndex: _unused, ...rest }) => rest),
     detectedQuestions,
-    cards,
+    cards: positionedCards,
     links,
   };
 }

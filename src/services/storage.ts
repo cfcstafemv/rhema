@@ -1,5 +1,4 @@
 import { SermonNote, CardType, SermonCategory } from '../types';
-import { INITIAL_SAMPLE_SERMON } from '../data/bibleData';
 
 const STORAGE_KEY = 'rhema_sermons_v1';
 const ACTIVE_SERMON_KEY = 'rhema_active_sermon_id_v1';
@@ -50,12 +49,43 @@ export function resetCustomCardTypeLabels(): Record<CardType, string> {
   return { ...DEFAULT_CARD_TYPE_LABELS };
 }
 
+export function createEmptyInitialSermon(): SermonNote {
+  const now = Date.now();
+  return {
+    id: 'sermon-' + now,
+    title: 'Nuevo Estudio',
+    category: 'Predicas Dominicales',
+    preacher: '',
+    churchName: '',
+    date: new Date().toISOString().split('T')[0],
+    series: '',
+    mainScripture: 'Juan 15',
+    activePassage: {
+      bookId: 'jua',
+      chapter: 15,
+    },
+    highlights: [],
+    cards: [],
+    links: [],
+    reflection: {
+      godSpokeToMe: '',
+      personalApplication: '',
+      prayerRequest: '',
+      spiritualCommitment: '',
+      keyGratitude: '',
+      updatedAt: now,
+    },
+    updatedAt: now,
+  };
+}
+
 export function getAllSermons(): SermonNote[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      const initial = [INITIAL_SAMPLE_SERMON];
+      const initial = [createEmptyInitialSermon()];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+      localStorage.setItem(ACTIVE_SERMON_KEY, initial[0].id);
       return initial;
     }
     const parsed = JSON.parse(raw);
@@ -65,10 +95,13 @@ export function getAllSermons(): SermonNote[] {
         category: s.category || 'Predicas Dominicales',
       }));
     }
-    return [INITIAL_SAMPLE_SERMON];
+    const fallback = [createEmptyInitialSermon()];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
+    localStorage.setItem(ACTIVE_SERMON_KEY, fallback[0].id);
+    return fallback;
   } catch (error) {
-    console.warn('Error loading sermons from localStorage, falling back to sample', error);
-    return [INITIAL_SAMPLE_SERMON];
+    console.warn('Error loading sermons from localStorage, falling back to blank study', error);
+    return [createEmptyInitialSermon()];
   }
 }
 
@@ -100,7 +133,7 @@ export function getActiveSermon(): SermonNote {
     const found = all.find((s) => s.id === activeId);
     if (found) return found;
   }
-  return all[0] || INITIAL_SAMPLE_SERMON;
+  return all[0] || createEmptyInitialSermon();
 }
 
 export function createNewSermon(
@@ -153,14 +186,14 @@ export function createNewSermon(
 
 export function deleteSermon(id: string): SermonNote[] {
   const all = getAllSermons().filter((s) => s.id !== id);
-  const finalAll = all.length > 0 ? all : [INITIAL_SAMPLE_SERMON];
+  const finalAll = all.length > 0 ? all : [createEmptyInitialSermon()];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(finalAll));
   localStorage.setItem(ACTIVE_SERMON_KEY, finalAll[0].id);
   return finalAll;
 }
 
 export function replaceAllSermonsInStorage(sermons: SermonNote[], preferredActiveId?: string): SermonNote[] {
-  const finalAll = sermons.length > 0 ? sermons : [INITIAL_SAMPLE_SERMON];
+  const finalAll = sermons.length > 0 ? sermons : [createEmptyInitialSermon()];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(finalAll));
   const activeExists = preferredActiveId && finalAll.some((s) => s.id === preferredActiveId);
   localStorage.setItem(ACTIVE_SERMON_KEY, activeExists ? preferredActiveId! : finalAll[0].id);

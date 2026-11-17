@@ -134,6 +134,18 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = React.memo(({
     }, 250);
   };
 
+  const handleContentFocus = () => {
+    const trimmed = (latestContentRef.current || '').replace(/\r/g, '').trim();
+    if (
+      trimmed === '💬 Respuestas y aportes del grupo:\n•' ||
+      trimmed === '💬 Respuestas y aportes del grupo:'
+    ) {
+      setLocalContent('');
+      latestContentRef.current = '';
+      onUpdate(card.id, { content: '' });
+    }
+  };
+
   const handleContentBlur = () => {
     if (contentTimerRef.current) {
       clearTimeout(contentTimerRef.current);
@@ -470,11 +482,16 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = React.memo(({
         {/* Content Note Textarea */}
         <textarea
           value={localContent}
+          onFocus={handleContentFocus}
           onChange={(e) => handleContentChange(e.target.value)}
           onBlur={handleContentBlur}
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
-          placeholder="Escribe las notas, argumentos del pastor, preguntas o citas..."
+          placeholder={
+            card.customTypeLabel === 'Pregunta de Diálogo'
+              ? '💬 Respuestas y aportes del grupo...'
+              : 'Escribe las notas, argumentos del pastor, preguntas o citas...'
+          }
           rows={Math.min(
             10,
             Math.max(
@@ -531,13 +548,34 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = React.memo(({
         )}
       </div>
 
-      {/* Minimized preview label with editable title */}
+      {/* Minimized preview label with quick verse link & editable title */}
       {card.isMinimized && (
         <div 
           className="px-3 py-1.5 flex items-center gap-1.5 no-drag touch-auto select-text"
           onMouseDown={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
+          {card.linkedVerseRef && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onNavigateToLinkedVerse?.(card.linkedVerseRef!);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="p-1.5 rounded-lg transition-all cursor-pointer shrink-0 hover:brightness-95 active:scale-95 no-drag"
+              style={{
+                backgroundColor: `${card.color}18`,
+                border: `1px solid ${card.color}40`,
+                color: card.color,
+              }}
+              title={`Ir a ${card.linkedVerseRef} en la Biblia`}
+              aria-label={`Ir a ${card.linkedVerseRef} en la Biblia`}
+            >
+              <Link2 className="w-3.5 h-3.5" />
+            </button>
+          )}
           <input
             type="text"
             value={localTitle}
@@ -546,7 +584,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = React.memo(({
             onMouseDown={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
             placeholder="Título de la tarjeta..."
-            className="w-full text-xs font-serif font-bold text-stone-800 dark:text-stone-200 bg-transparent border-b border-dashed border-stone-300 dark:border-stone-700 hover:border-amber-500 focus:border-amber-600 focus:outline-hidden py-0.5 transition-colors no-drag"
+            className="flex-1 min-w-0 text-xs font-serif font-bold text-stone-800 dark:text-stone-200 bg-transparent border-b border-dashed border-stone-300 dark:border-stone-700 hover:border-amber-500 focus:border-amber-600 focus:outline-hidden py-0.5 transition-colors no-drag"
             title="Editar título de la tarjeta"
           />
           <PenLine className="w-3 h-3 text-stone-400 shrink-0" />

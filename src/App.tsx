@@ -26,6 +26,7 @@ import {
 } from './services/storage';
 import { BIBLE_BOOKS, CARD_TYPES, BIBLE_TRANSLATIONS } from './data/bibleData';
 import { getAvailableBibleTranslations, BibleTranslationOption } from './services/bibleService';
+import { arrangeCardsInZones, computeNewCardPosition } from './utils/canvasZones';
 
 // Lazy-loaded heavy modals & secondary views to keep initial startup fast on tablets/low-end PCs
 const PersonalReflectionsModal = React.lazy(() =>
@@ -52,8 +53,12 @@ const DriveSyncModal = React.lazy(() =>
 const PrivacyPolicyModal = React.lazy(() =>
   import('./components/PrivacyPolicyModal').then((m) => ({ default: m.PrivacyPolicyModal }))
 );
+const FirstVisitGoogleModal = React.lazy(() =>
+  import('./components/FirstVisitGoogleModal').then((m) => ({ default: m.FirstVisitGoogleModal }))
+);
 
 const AUTO_SAVE_INTERVAL_MS = 90_000; // 1.5 minutos
+const FIRST_VISIT_AUTH_PROMPT_KEY = 'rhema_first_visit_auth_prompt_v1';
 
 export default function App() {
   const [sermons, setSermons] = useState<SermonNote[]>([]);
@@ -79,6 +84,8 @@ export default function App() {
   });
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [hasDriveToken, setHasDriveToken] = useState(false);
+  const [isAuthResolved, setIsAuthResolved] = useState(false);
+  const [isFirstVisitAuthOpen, setIsFirstVisitAuthOpen] = useState(false);
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -170,6 +177,10 @@ export default function App() {
   useEffect(() => {
     let unsub: (() => void) | undefined;
     let cancelled = false;
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled) setIsAuthResolved(true);
+    }, 1800);
+
     import('./services/googleAuth')
       .then(({ initAuth }) => {
         if (cancelled) return;
@@ -177,24 +188,50 @@ export default function App() {
           (user) => {
             setGoogleUser(user);
             setHasDriveToken(true);
+            setIsAuthResolved(true);
           },
           (user) => {
             setGoogleUser(user);
             setHasDriveToken(false);
+            setIsAuthResolved(true);
           },
           () => {
             setGoogleUser(null);
             setHasDriveToken(false);
+            setIsAuthResolved(true);
           }
         );
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setIsAuthResolved(true);
+      });
 
     return () => {
       cancelled = true;
+      clearTimeout(fallbackTimer);
       unsub?.();
     };
   }, []);
+
+  // Suggest Google sign-in on the user's very first visit
+  useEffect(() => {
+    if (googleUser) {
+      try {
+        localStorage.setItem(FIRST_VISIT_AUTH_PROMPT_KEY, '1');
+      } catch {
+        // ignore storage errors
+      }
+      return;
+    }
+    if (showSplash || !isAuthResolved || isPrivacyOpen) return;
+    try {
+      if (!localStorage.getItem(FIRST_VISIT_AUTH_PROMPT_KEY)) {
+        setIsFirstVisitAuthOpen(true);
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }, [showSplash, isAuthResolved, googleUser, isPrivacyOpen]);
 
   const markDirty = useCallback(() => {
     hasUnsavedChangesRef.current = true;
@@ -440,7 +477,7 @@ export default function App() {
       quote: string,
       verseRef: string,
       cardType: CardType,
-      extra?: { imageUrl?: string; imageCaption?: string; title?: string }
+      extra?: { imageUrl?: string; imageCaption?: string; title?: string; customTypeLabel?: string }
     ) => {
       const typeInfo = CARD_TYPES.find((t) => t.id === cardType) || CARD_TYPES[0];
       const customLabels = getCustomCardTypeLabels();
@@ -448,18 +485,35 @@ export default function App() {
 
       updateSermonInMemory((prev) => {
         const cardCount = prev.cards.length;
-        const posX = 40 + (cardCount % 3) * 340;
-        const posY = 50 + Math.floor(cardCount / 3) * 260;
-
-        const newCard: FloatingCard = {
+        const cellModeActive =
+          prev.studyMode === 'cell' || prev.category === 'Células de estudio';
+        const draftCard: Partial<FloatingCard> = {
           id: newCardId,
           type: cardType,
+          customTypeLabel: extra?.customTypeLabel,
+          tags: extra?.customTypeLabel ? [extra.customTypeLabel] : undefined,
           title:
             extra?.title ||
             (cardType === 'central' ? customLabels.central || 'Verdad Central' : `Nota sobre ${verseRef}`),
           content: extra?.imageUrl
             ? extra.imageCaption || `Contexto geográfico e histórico de ${verseRef}`
             : `Reflexión inspirada en: "${quote}"`,
+          linkedVerseRef: verseRef,
+          imageUrl: extra?.imageUrl,
+        };
+        const { x: posX, y: posY } = computeNewCardPosition(
+          prev.cards,
+          draftCard,
+          cellModeActive
+        );
+
+        const newCard: FloatingCard = {
+          id: newCardId,
+          type: cardType,
+          customTypeLabel: extra?.customTypeLabel,
+          tags: extra?.customTypeLabel ? [extra.customTypeLabel] : undefined,
+          title: draftCard.title!,
+          content: draftCard.content!,
           color: typeInfo.color,
           x: posX,
           y: posY,
@@ -479,7 +533,7 @@ export default function App() {
           fromVerseRef: verseRef,
           toCardId: newCardId,
           color: typeInfo.color,
-          label: customLabels[cardType] || typeInfo.label,
+          label: extra?.customTypeLabel || customLabels[cardType] || typeInfo.label,
         };
 
         return {
@@ -503,13 +557,19 @@ export default function App() {
 
       updateSermonInMemory((prev) => {
         const cardCount = prev.cards.length;
-        const posX = 60 + (cardCount % 3) * 330;
-        const posY = 60 + Math.floor(cardCount / 3) * 250;
+        const cellModeActive =
+          prev.studyMode === 'cell' || prev.category === 'Células de estudio';
+        const title = customLabels[cardType] || typeInfo.label;
+        const { x: posX, y: posY } = computeNewCardPosition(
+          prev.cards,
+          { id: newCardId, type: cardType, title },
+          cellModeActive
+        );
 
         const newCard: FloatingCard = {
           id: newCardId,
           type: cardType,
-          title: customLabels[cardType] || typeInfo.label,
+          title,
           content: '',
           color: typeInfo.color,
           x: posX,
@@ -536,6 +596,60 @@ export default function App() {
         cards: prev.cards.map((c) => (c.id === id ? { ...c, ...updates } : c)),
         updatedAt: Date.now(),
       }));
+    },
+    [updateSermonInMemory]
+  );
+
+  const handleCreateCellQuestionCard = useCallback(
+    (idx: number, questionTitle: string, content: string) => {
+      updateSermonInMemory((prev) => {
+        const existing = prev.cards.find(
+          (c) => /^card-cell-q-.*-\d+$/.test(c.id) && c.id.endsWith(`-${idx}`)
+        );
+        if (existing) {
+          return {
+            ...prev,
+            cards: prev.cards.map((c) =>
+              c.id === existing.id ? { ...c, content } : c
+            ),
+            updatedAt: Date.now(),
+          };
+        }
+
+        const newCardId = `card-cell-q-${Date.now()}-${idx}`;
+        const pos = computeNewCardPosition(
+          prev.cards,
+          {
+            id: newCardId,
+            type: 'action',
+            customTypeLabel: 'Pregunta de Diálogo',
+            tags: ['Pregunta de Diálogo'],
+            title: questionTitle,
+          },
+          true
+        );
+
+        const newCard: FloatingCard = {
+          id: newCardId,
+          type: 'action',
+          customTypeLabel: 'Pregunta de Diálogo',
+          tags: ['Pregunta de Diálogo'],
+          title: questionTitle,
+          content,
+          color: '#10B981',
+          x: pos.x,
+          y: pos.y,
+          width: 320,
+          zIndex: prev.cards.length + 2,
+          createdAt: Date.now(),
+        };
+
+        return {
+          ...prev,
+          cards: [...prev.cards, newCard],
+          updatedAt: Date.now(),
+        };
+      });
     },
     [updateSermonInMemory]
   );
@@ -611,12 +725,37 @@ export default function App() {
 
   const handleApplyTemplate = useCallback(
     (newCards: FloatingCard[], mode: 'replace' | 'append') => {
-      updateSermonInMemory((prev) => ({
-        ...prev,
-        cards: mode === 'replace' ? newCards : [...prev.cards, ...newCards],
-        links: mode === 'replace' ? [] : prev.links,
-        updatedAt: Date.now(),
-      }));
+      updateSermonInMemory((prev) => {
+        const cellModeActive =
+          prev.studyMode === 'cell' || prev.category === 'Células de estudio';
+
+        if (mode === 'replace') {
+          const arranged = arrangeCardsInZones(newCards, cellModeActive);
+          const posMap = new Map(arranged.map((p) => [p.id, p]));
+          const positioned = newCards.map((c) => {
+            const pos = posMap.get(c.id);
+            return pos ? { ...c, x: pos.x, y: pos.y } : c;
+          });
+          return {
+            ...prev,
+            cards: positioned,
+            links: [],
+            updatedAt: Date.now(),
+          };
+        }
+
+        const accCards = [...prev.cards];
+        for (const tplCard of newCards) {
+          const pos = computeNewCardPosition(accCards, tplCard, cellModeActive);
+          accCards.push({ ...tplCard, x: pos.x, y: pos.y });
+        }
+
+        return {
+          ...prev,
+          cards: accCards,
+          updatedAt: Date.now(),
+        };
+      });
       setActiveView('split');
     },
     [updateSermonInMemory]
@@ -730,18 +869,26 @@ export default function App() {
     (verseRef: string) => {
       const match = verseRef.match(/^(.+?)\s+(\d+):(\d+)(?:[-–—]\d+)?$/);
       if (match) {
-        const bookName = match[1].trim();
+        const rawBookName = match[1].trim().toLowerCase();
+        const normalizedBookName = rawBookName === 'salmo' ? 'salmos' : rawBookName;
         const chapter = parseInt(match[2], 10);
         const verse = parseInt(match[3], 10);
 
         const foundBook = BIBLE_BOOKS.find(
           (b) =>
-            b.name.toLowerCase() === bookName.toLowerCase() ||
-            b.shortName.toLowerCase() === bookName.toLowerCase()
+            b.name.toLowerCase() === normalizedBookName ||
+            b.shortName.toLowerCase() === normalizedBookName
         );
 
         if (foundBook) {
+          const current = sermonRef.current;
+          const currentlyCell =
+            current.studyMode === 'cell' || current.category === 'Células de estudio';
           handleSelectPassage(foundBook.id, chapter);
+          if (currentlyCell) {
+            handleToggleCellMode();
+          }
+          setIsBibleCollapsed(false);
           setHighlightedVerseId(verse);
           setActiveView('split');
 
@@ -754,7 +901,7 @@ export default function App() {
         }
       }
     },
-    [handleSelectPassage]
+    [handleSelectPassage, handleToggleCellMode]
   );
 
   const handleSelectSermon = useCallback(
@@ -957,6 +1104,9 @@ export default function App() {
                   onOpenUploadModal={handleRequestOpenCellPdfUpload}
                   onSwitchToSermonMode={handleToggleCellMode}
                   onSelectPassageInBible={handleSelectPassageInCellMode}
+                  onUpdateCard={handleUpdateCard}
+                  onCreateQuestionCard={handleCreateCellQuestionCard}
+                  onDirty={markDirty}
                   cards={sermon.cards}
                 />
               ) : (
@@ -1014,6 +1164,7 @@ export default function App() {
               onNavigateToLinkedVerse={handleNavigateToLinkedVerse}
               onApplyTemplate={handleApplyTemplate}
               isSplitView={activeView === 'split' && !isBibleCollapsed}
+              isCellMode={isCellMode}
             />
           </div>
         )}
@@ -1174,6 +1325,23 @@ export default function App() {
           <PrivacyPolicyModal
             isOpen={isPrivacyOpen}
             onClose={() => setIsPrivacyOpen(false)}
+          />
+        )}
+
+        {isFirstVisitAuthOpen && (
+          <FirstVisitGoogleModal
+            isOpen={isFirstVisitAuthOpen}
+            onClose={() => {
+              try {
+                localStorage.setItem(FIRST_VISIT_AUTH_PROMPT_KEY, '1');
+              } catch {
+                // ignore
+              }
+              setIsFirstVisitAuthOpen(false);
+            }}
+            onAuthUpdated={handleAuthUpdated}
+            onOpenDriveSyncWithBackup={() => setIsDriveSyncOpen(true)}
+            onOpenPrivacy={() => setIsPrivacyOpen(true)}
           />
         )}
       </Suspense>
