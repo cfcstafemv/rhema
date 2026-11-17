@@ -89,10 +89,10 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, 
               <span className="text-stone-600 dark:text-stone-400">
                 Si tienes dudas sobre privacidad o deseas reportar un problema técnico, puedes escribir a{' '}
                 <a
-                  href="mailto:cfcstafe.mv@gmail.com"
+                  href="mailto:appecrafter.stafe@gmail.com"
                   className="text-amber-700 dark:text-amber-400 font-medium hover:underline"
                 >
-                  cfcstafe.mv@gmail.com
+                  appecrafter.stafe@gmail.com
                 </a>
                 .
               </span>
