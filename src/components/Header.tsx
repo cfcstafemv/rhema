@@ -15,6 +15,8 @@ import {
   Users,
   Upload,
   Save,
+  Cloud,
+  ShieldCheck,
 } from 'lucide-react';
 import { SermonNote, SermonCategory, SERMON_CATEGORIES } from '../types';
 
@@ -37,6 +39,12 @@ interface HeaderProps {
   hasUnsavedChanges?: boolean;
   onManualSave?: () => void;
   lastSavedAt?: number | null;
+  onShowSplash?: () => void;
+  onOpenDriveSync?: () => void;
+  googleUserPhoto?: string | null;
+  googleUserName?: string | null;
+  isDriveConnected?: boolean;
+  onOpenPrivacy?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({
@@ -58,6 +66,12 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   hasUnsavedChanges = false,
   onManualSave,
   lastSavedAt,
+  onShowSplash,
+  onOpenDriveSync,
+  googleUserPhoto,
+  googleUserName,
+  isDriveConnected = false,
+  onOpenPrivacy,
 }) => {
   const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [metaTitle, setMetaTitle] = useState(sermon.title);
@@ -82,11 +96,17 @@ export const Header: React.FC<HeaderProps> = React.memo(({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 sm:px-5 py-2">
         {/* Zone 1: Brand wordmark with official logo */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onShowSplash}
+            className="flex items-center gap-2 text-left group cursor-pointer rounded-xl p-0.5 -m-0.5 hover:bg-stone-200/40 dark:hover:bg-stone-800/50 active:scale-95 transition-all"
+            title="Ver pantalla de carga"
+            aria-label="Ver pantalla de carga de Rhema"
+          >
             <img
               src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
               alt="Rhema Logo"
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs bg-white border border-stone-200/90 dark:border-stone-700/80 p-0.5 shrink-0"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl object-contain shadow-xs bg-white border border-stone-200/90 dark:border-stone-700/80 p-0.5 shrink-0 group-hover:scale-105 transition-transform"
             />
             <div className="flex flex-col">
               <span className="text-base sm:text-xl font-cinzel font-bold tracking-wider text-stone-900 dark:text-stone-100 leading-none">
@@ -96,7 +116,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 ῥῆμα
               </span>
             </div>
-          </div>
+          </button>
           <span className="hidden 2xl:inline text-xs text-stone-400 dark:text-stone-500 font-serif italic border-l border-stone-300 dark:border-stone-700 pl-3">
             Estudio & Lienzo de Prédicas
           </span>
@@ -147,6 +167,18 @@ export const Header: React.FC<HeaderProps> = React.memo(({
               {isCellMode && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               )}
+            </button>
+          )}
+
+          {onOpenPrivacy && (
+            <button
+              type="button"
+              onClick={onOpenPrivacy}
+              className="flex items-center gap-1 hover:text-stone-900 dark:hover:text-stone-100 text-stone-500 dark:text-stone-400 transition-colors whitespace-nowrap cursor-pointer py-0.5"
+              title="Ver Política de Privacidad de Rhema"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600/80 dark:text-emerald-400/80 shrink-0" />
+              <span>Privacidad</span>
             </button>
           )}
         </nav>
@@ -237,6 +269,40 @@ export const Header: React.FC<HeaderProps> = React.memo(({
           >
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-stone-600" />}
           </button>
+
+          {/* Google Drive Sync button */}
+          {onOpenDriveSync && (
+            <button
+              type="button"
+              onClick={onOpenDriveSync}
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-xs rounded-lg border transition-colors cursor-pointer whitespace-nowrap ${
+                isDriveConnected
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 font-medium'
+                  : 'bg-stone-100 hover:bg-stone-200/70 dark:bg-stone-800 dark:hover:bg-stone-700/80 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-700'
+              }`}
+              title={
+                googleUserName
+                  ? `Sincronizar con Google Drive (${googleUserName})`
+                  : 'Conectar Google Drive para guardar respaldo en tu nube'
+              }
+            >
+              {googleUserPhoto ? (
+                <img
+                  src={googleUserPhoto}
+                  alt={googleUserName || 'Google'}
+                  className="w-4 h-4 rounded-full shrink-0"
+                />
+              ) : (
+                <Cloud className={`w-3.5 h-3.5 shrink-0 ${isDriveConnected ? 'text-blue-600 dark:text-blue-400' : 'text-stone-500 dark:text-stone-400'}`} />
+              )}
+              <span className="hidden md:inline">
+                {googleUserName ? 'Drive' : 'Google Drive'}
+              </span>
+              {isDriveConnected && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+              )}
+            </button>
+          )}
 
           {/* Manual Save Button */}
           {onManualSave && (

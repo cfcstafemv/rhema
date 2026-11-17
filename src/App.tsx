@@ -14,12 +14,14 @@ import {
   HeartHandshake,
   Maximize2,
 } from 'lucide-react';
+import type { User } from 'firebase/auth';
 import {
   getActiveSermon,
   getAllSermons,
   saveSermon,
   createNewSermon,
   deleteSermon,
+  replaceAllSermonsInStorage,
   getCustomCardTypeLabels,
 } from './services/storage';
 import { BIBLE_BOOKS, CARD_TYPES, BIBLE_TRANSLATIONS } from './data/bibleData';
@@ -44,6 +46,12 @@ const QuickPassageSearchModal = React.lazy(() =>
 const CellPdfUploadModal = React.lazy(() =>
   import('./components/CellPdfUploadModal').then((m) => ({ default: m.CellPdfUploadModal }))
 );
+const DriveSyncModal = React.lazy(() =>
+  import('./components/DriveSyncModal').then((m) => ({ default: m.DriveSyncModal }))
+);
+const PrivacyPolicyModal = React.lazy(() =>
+  import('./components/PrivacyPolicyModal').then((m) => ({ default: m.PrivacyPolicyModal }))
+);
 
 const AUTO_SAVE_INTERVAL_MS = 90_000; // 1.5 minutos
 
@@ -61,6 +69,16 @@ export default function App() {
   const [isSermonsListOpen, setIsSermonsListOpen] = useState(false);
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [isCellPdfUploadOpen, setIsCellPdfUploadOpen] = useState(false);
+  const [isDriveSyncOpen, setIsDriveSyncOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.location.search.includes('privacidad') ||
+      window.location.hash.toLowerCase().includes('privacidad')
+    );
+  });
+  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [hasDriveToken, setHasDriveToken] = useState(false);
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
@@ -79,22 +97,32 @@ export default function App() {
   hasUnsavedChangesRef.current = hasUnsavedChanges;
   const pendingActionRef = useRef<(() => void) | null>(null);
 
+  const splashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const splashFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const isCellMode = sermon.studyMode === 'cell' || sermon.category === 'Células de estudio';
 
-  // Fast non-blocking splash screen
-  useEffect(() => {
-    let removeTimer: ReturnType<typeof setTimeout>;
-    const timer = setTimeout(() => {
+  const triggerSplash = useCallback((durationMs = 1600) => {
+    if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
+    if (splashFadeTimerRef.current) clearTimeout(splashFadeTimerRef.current);
+    setIsFadingOut(false);
+    setShowSplash(true);
+    splashTimerRef.current = setTimeout(() => {
       setIsFadingOut(true);
-      removeTimer = setTimeout(() => {
+      splashFadeTimerRef.current = setTimeout(() => {
         setShowSplash(false);
-      }, 250);
-    }, 450);
-    return () => {
-      clearTimeout(timer);
-      if (removeTimer) clearTimeout(removeTimer);
-    };
+      }, 350);
+    }, durationMs);
   }, []);
+
+  // Initial splash screen with bounce effect
+  useEffect(() => {
+    triggerSplash(900);
+    return () => {
+      if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
+      if (splashFadeTimerRef.current) clearTimeout(splashFadeTimerRef.current);
+    };
+  }, [triggerSplash]);
 
   useEffect(() => {
     const loaded = getAllSermons();
@@ -135,6 +163,36 @@ export default function App() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  // Initialize Firebase Google Auth listener lazily after startup
+  useEffect(() => {
+    let unsub: (() => void) | undefined;
+    let cancelled = false;
+    import('./services/googleAuth')
+      .then(({ initAuth }) => {
+        if (cancelled) return;
+        unsub = initAuth(
+          (user) => {
+            setGoogleUser(user);
+            setHasDriveToken(true);
+          },
+          (user) => {
+            setGoogleUser(user);
+            setHasDriveToken(false);
+          },
+          () => {
+            setGoogleUser(null);
+            setHasDriveToken(false);
+          }
+        );
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      unsub?.();
     };
   }, []);
 
@@ -793,18 +851,44 @@ export default function App() {
   const handleOpenPresentationMode = useCallback(() => setIsPresentationOpen(true), []);
   const handleOpenExport = useCallback(() => setIsExportOpen(true), []);
   const handleOpenQuickSearch = useCallback(() => setIsQuickSearchOpen(true), []);
+  const handleOpenDriveSync = useCallback(() => setIsDriveSyncOpen(true), []);
+  const handleOpenPrivacy = useCallback(() => setIsPrivacyOpen(true), []);
   const handleCollapseBible = useCallback(() => setIsBibleCollapsed(true), []);
   const handleNewDefaultSermon = useCallback(() => handleNewSermon(), [handleNewSermon]);
+
+  const handleAuthUpdated = useCallback((user: User | null, hasToken: boolean) => {
+    setGoogleUser(user);
+    setHasDriveToken(hasToken);
+  }, []);
+
+  const handleMergedFromDrive = useCallback((mergedSermons: SermonNote[], preferredActiveId?: string) => {
+    const stored = replaceAllSermonsInStorage(mergedSermons, sermonRef.current.id || preferredActiveId);
+    setSermons(stored);
+    const active = getActiveSermon();
+    sermonRef.current = active;
+    setSermon(active);
+    hasUnsavedChangesRef.current = false;
+    setHasUnsavedChanges(false);
+    setLastSavedAt(Date.now());
+  }, []);
+
+  const handleReplaySplash = useCallback(() => triggerSplash(1600), [triggerSplash]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] text-stone-900 dark:text-stone-100 relative">
       {showSplash && (
         <div
-          className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FBF9F5] dark:bg-[#0E1015] transition-opacity duration-300 ${
+          onClick={() => {
+            if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
+            if (splashFadeTimerRef.current) clearTimeout(splashFadeTimerRef.current);
+            setIsFadingOut(true);
+            splashFadeTimerRef.current = setTimeout(() => setShowSplash(false), 250);
+          }}
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#FBF9F5] dark:bg-[#0E1015] transition-opacity duration-300 cursor-pointer ${
             isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
           }`}
         >
-          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 p-2 shadow-2xl flex items-center justify-center mb-4">
+          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 p-2 shadow-2xl animate-bounce flex items-center justify-center mb-4">
             <img
               src="/assets/aistudio/logoRHEMA_4329ba63.jpg"
               alt="Rhema Logo"
@@ -842,6 +926,12 @@ export default function App() {
         hasUnsavedChanges={hasUnsavedChanges}
         onManualSave={persistCurrentSermon}
         lastSavedAt={lastSavedAt}
+        onShowSplash={handleReplaySplash}
+        onOpenDriveSync={handleOpenDriveSync}
+        googleUserPhoto={googleUser?.photoURL}
+        googleUserName={googleUser?.displayName || googleUser?.email}
+        isDriveConnected={Boolean(googleUser && hasDriveToken)}
+        onOpenPrivacy={handleOpenPrivacy}
       />
 
       <main className="flex-1 flex overflow-hidden relative">
@@ -1058,6 +1148,32 @@ export default function App() {
             isOpen={isCellPdfUploadOpen}
             onClose={() => setIsCellPdfUploadOpen(false)}
             onLessonLoaded={handleCellLessonLoaded}
+          />
+        )}
+
+        {isDriveSyncOpen && (
+          <DriveSyncModal
+            isOpen={isDriveSyncOpen}
+            onClose={() => setIsDriveSyncOpen(false)}
+            googleUser={googleUser}
+            hasAccessToken={hasDriveToken}
+            onAuthUpdated={handleAuthUpdated}
+            localSermonsCount={sermons.length}
+            activeSermonId={sermon.id}
+            hasUnsavedChanges={hasUnsavedChanges}
+            onFlushLocalSave={flushSaveNow}
+            onMergedFromDrive={handleMergedFromDrive}
+            onOpenPrivacy={() => {
+              setIsDriveSyncOpen(false);
+              setIsPrivacyOpen(true);
+            }}
+          />
+        )}
+
+        {isPrivacyOpen && (
+          <PrivacyPolicyModal
+            isOpen={isPrivacyOpen}
+            onClose={() => setIsPrivacyOpen(false)}
           />
         )}
       </Suspense>

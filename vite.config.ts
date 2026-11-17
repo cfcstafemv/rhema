@@ -11,7 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'assets/aistudio/rhema2_97cdc8b7.jpg'],
+        includeAssets: ['assets/aistudio/logoRHEMA_4329ba63.jpg'],
         manifest: {
           id: '/',
           name: 'Rhema — Notas de Prédica y Lienzo Bíblico',
@@ -24,13 +24,13 @@ export default defineConfig(() => {
           scope: '/',
           icons: [
             {
-              src: '/assets/aistudio/rhema2_97cdc8b7.jpg',
+              src: '/assets/aistudio/logoRHEMA_4329ba63.jpg',
               sizes: '192x192',
               type: 'image/jpeg',
               purpose: 'any maskable',
             },
             {
-              src: '/assets/aistudio/rhema2_97cdc8b7.jpg',
+              src: '/assets/aistudio/logoRHEMA_4329ba63.jpg',
               sizes: '512x512',
               type: 'image/jpeg',
               purpose: 'any maskable',

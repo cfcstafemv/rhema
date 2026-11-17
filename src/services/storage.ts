@@ -159,6 +159,14 @@ export function deleteSermon(id: string): SermonNote[] {
   return finalAll;
 }
 
+export function replaceAllSermonsInStorage(sermons: SermonNote[], preferredActiveId?: string): SermonNote[] {
+  const finalAll = sermons.length > 0 ? sermons : [INITIAL_SAMPLE_SERMON];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(finalAll));
+  const activeExists = preferredActiveId && finalAll.some((s) => s.id === preferredActiveId);
+  localStorage.setItem(ACTIVE_SERMON_KEY, activeExists ? preferredActiveId! : finalAll[0].id);
+  return finalAll;
+}
+
 export function exportSermonToJson(sermon: SermonNote): void {
   if (typeof window === 'undefined') return;
   const jsonStr = JSON.stringify(sermon, null, 2);
