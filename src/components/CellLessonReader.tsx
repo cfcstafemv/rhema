@@ -35,10 +35,25 @@ const isDefaultQuestionPrompt = (val?: string): boolean => {
   );
 };
 
+type CellFontSize = 'sm' | 'base' | 'lg';
+
+const FONT_SIZE_CLASSES: Record<CellFontSize, string> = {
+  sm: 'text-xs leading-relaxed',
+  base: 'text-sm leading-relaxed',
+  lg: 'text-base sm:text-lg leading-loose',
+};
+
+const TITLE_FONT_SIZE_CLASSES: Record<CellFontSize, string> = {
+  sm: 'text-xs leading-snug',
+  base: 'text-xs sm:text-sm leading-snug',
+  lg: 'text-base sm:text-lg leading-snug',
+};
+
 interface EditableCellQuestionItemProps {
   idx: number;
   questionText: string;
   matchingCard?: FloatingCard;
+  fontSize: CellFontSize;
   onUpdateCard?: (id: string, updates: Partial<FloatingCard>) => void;
   onCreateQuestionCard?: (idx: number, questionTitle: string, content: string) => void;
   onDirty?: () => void;
@@ -48,6 +63,7 @@ const EditableCellQuestionItem: React.FC<EditableCellQuestionItemProps> = ({
   idx,
   questionText,
   matchingCard,
+  fontSize,
   onUpdateCard,
   onCreateQuestionCard,
   onDirty,
@@ -127,7 +143,7 @@ const EditableCellQuestionItem: React.FC<EditableCellQuestionItemProps> = ({
         <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
           {idx + 1}
         </span>
-        <h4 className="font-sans font-bold text-xs sm:text-sm text-stone-900 dark:text-stone-100 leading-snug break-words">
+        <h4 className={`font-sans font-bold text-stone-900 dark:text-stone-100 break-words ${TITLE_FONT_SIZE_CLASSES[fontSize]}`}>
           {displayQuestion}
         </h4>
       </div>
@@ -139,7 +155,7 @@ const EditableCellQuestionItem: React.FC<EditableCellQuestionItemProps> = ({
         onBlur={handleBlur}
         rows={lineCount}
         placeholder="💬 Respuestas y aportes del grupo..."
-        className="w-full p-2.5 rounded-lg bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 focus:outline-hidden text-xs text-stone-800 dark:text-stone-200 placeholder:text-stone-400 font-sans leading-relaxed resize-y transition-colors"
+        className={`w-full p-2.5 rounded-lg bg-stone-50 dark:bg-stone-800/60 border border-stone-200 dark:border-stone-700/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/40 focus:outline-hidden text-stone-800 dark:text-stone-200 placeholder:text-stone-400 font-sans resize-y transition-colors ${FONT_SIZE_CLASSES[fontSize]}`}
       />
     </div>
   );
@@ -170,13 +186,7 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'all' | 'scriptures' | 'questions'>('all');
-  const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base');
-
-  const FONT_SIZE_CLASSES = {
-    sm: 'text-xs leading-relaxed',
-    base: 'text-sm leading-relaxed',
-    lg: 'text-base sm:text-lg leading-loose',
-  };
+  const [fontSize, setFontSize] = useState<CellFontSize>('base');
 
   const cleanText = cellLesson?.fullText || '';
   const rawParagraphs = cleanText.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
@@ -376,30 +386,42 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
             </div>
 
             <div className="space-y-2">
-              {cellLesson.detectedScriptures.map((sc, idx) => {
-                const ref = typeof sc === 'string' ? sc : (sc as any).ref;
-                const matchingCard = cards.find((c) => c.linkedVerseRef === ref);
-                return (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-sans font-bold text-xs text-blue-700 dark:text-blue-400">
-                        {ref}
-                      </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-200">
-                        Orden #{idx + 1}
-                      </span>
+              {cellLesson.detectedScriptures
+                .map((sc, idx) => ({ sc, idx }))
+                .filter(({ sc }) => {
+                  if (!searchQuery.trim()) return true;
+                  const ref = typeof sc === 'string' ? sc : (sc as any).ref;
+                  const matchingCard = cards.find((c) => c.linkedVerseRef === ref);
+                  const qLower = searchQuery.toLowerCase();
+                  return (
+                    ref.toLowerCase().includes(qLower) ||
+                    (matchingCard?.linkedQuote || '').toLowerCase().includes(qLower)
+                  );
+                })
+                .map(({ sc, idx }) => {
+                  const ref = typeof sc === 'string' ? sc : (sc as any).ref;
+                  const matchingCard = cards.find((c) => c.linkedVerseRef === ref);
+                  return (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`font-sans font-bold text-blue-700 dark:text-blue-400 ${TITLE_FONT_SIZE_CLASSES[fontSize]}`}>
+                          {ref}
+                        </span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-200 shrink-0">
+                          Orden #{idx + 1}
+                        </span>
+                      </div>
+                      {matchingCard?.linkedQuote && (
+                        <p className={`text-stone-700 dark:text-stone-300 font-sans ${FONT_SIZE_CLASSES[fontSize]}`}>
+                          «{matchingCard.linkedQuote}»
+                        </p>
+                      )}
                     </div>
-                    {matchingCard?.linkedQuote && (
-                      <p className="text-xs text-stone-700 dark:text-stone-300 font-sans leading-relaxed">
-                        «{matchingCard.linkedQuote}»
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
         )}
@@ -440,6 +462,7 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
                       idx={idx}
                       questionText={q}
                       matchingCard={matchingCard}
+                      fontSize={fontSize}
                       onUpdateCard={onUpdateCard}
                       onCreateQuestionCard={onCreateQuestionCard}
                       onDirty={onDirty}
