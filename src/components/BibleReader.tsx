@@ -29,6 +29,7 @@ import {
   Download,
   ExternalLink,
   ArrowRightLeft,
+  Users,
 } from 'lucide-react';
 import { VerseVersionComparatorModal } from './VerseVersionComparatorModal';
 import {
@@ -107,6 +108,7 @@ interface BibleReaderProps {
   onSelectTranslation: (translationId: string) => void;
   translations?: Array<{ id: string; name: string; shortName: string; description: string }>;
   onToggleCollapse?: () => void;
+  onBackToCellLesson?: () => void;
 }
 
 export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
@@ -122,6 +124,7 @@ export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
   onSelectTranslation,
   translations,
   onToggleCollapse,
+  onBackToCellLesson,
 }) => {
   const [searchBook, setSearchBook] = useState('');
   const [isBookDropdownOpen, setIsBookDropdownOpen] = useState(false);
@@ -841,6 +844,18 @@ export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
         </div>
 
         <div className="flex items-center gap-1">
+          {onBackToCellLesson && (
+            <button
+              type="button"
+              onClick={onBackToCellLesson}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer shrink-0"
+              title="Volver a la lección de Célula"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Célula</span>
+            </button>
+          )}
+
           <button
             onClick={() => setIsSettingsOpen(true)}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-stone-700 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors cursor-pointer border border-stone-200/80 dark:border-stone-700 shadow-2xs"

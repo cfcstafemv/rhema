@@ -165,6 +165,8 @@ interface CellLessonReaderProps {
   cellLesson?: CellLessonData;
   onOpenUploadModal: () => void;
   onSwitchToSermonMode: () => void;
+  onOpenBibleInCellMode?: () => void;
+  onOpenScriptureRef?: (ref: string) => void;
   onSelectPassageInBible?: (bookId: string, chapter: number) => void;
   onFocusCardOnCanvas?: (cardId: string) => void;
   onUpdateCard?: (id: string, updates: Partial<FloatingCard>) => void;
@@ -177,6 +179,8 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
   cellLesson,
   onOpenUploadModal,
   onSwitchToSermonMode,
+  onOpenBibleInCellMode,
+  onOpenScriptureRef,
   onSelectPassageInBible,
   onFocusCardOnCanvas,
   onUpdateCard,
@@ -238,14 +242,15 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
             <span className="sm:hidden">PDF</span>
           </button>
 
-          {/* Switch to Sermon / Bible Mode */}
+          {/* Switch between Cell Lesson and Bible inside Cell Mode */}
           <button
-            onClick={onSwitchToSermonMode}
+            type="button"
+            onClick={onOpenBibleInCellMode || onSwitchToSermonMode}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-700 dark:text-stone-300 text-xs font-medium transition-colors cursor-pointer"
-            title="Volver a la Biblia tradicional y modo de estudio dominical"
+            title="Alternar a la Biblia sin salir del Modo Célula"
           >
-            <BookOpen className="w-3.5 h-3.5 text-stone-500" />
-            <span className="hidden md:inline">Ver Biblia</span>
+            <BookOpen className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Biblia</span>
           </button>
         </div>
       </div>
@@ -410,9 +415,22 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
                         <span className={`font-sans font-bold text-blue-700 dark:text-blue-400 ${TITLE_FONT_SIZE_CLASSES[fontSize]}`}>
                           {ref}
                         </span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-200 shrink-0">
-                          Orden #{idx + 1}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {onOpenScriptureRef && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenScriptureRef(ref)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/70 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 text-[10px] font-semibold transition-colors cursor-pointer"
+                              title={`Abrir ${ref} en la Biblia`}
+                            >
+                              <BookOpen className="w-3 h-3" />
+                              <span>Leer</span>
+                            </button>
+                          )}
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-950 text-blue-900 dark:text-blue-200 shrink-0">
+                            Orden #{idx + 1}
+                          </span>
+                        </div>
                       </div>
                       {matchingCard?.linkedQuote && (
                         <p className={`text-stone-700 dark:text-stone-300 font-sans ${FONT_SIZE_CLASSES[fontSize]}`}>

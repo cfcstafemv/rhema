@@ -213,8 +213,8 @@ export const Header: React.FC<HeaderProps> = React.memo(({
             </button>
           )}
 
-          {/* View switcher on tablet/desktop (mobile uses bottom bar) */}
-          <div className="hidden sm:flex items-center p-0.5 bg-stone-200/70 dark:bg-stone-800 rounded-lg text-xs font-medium">
+          {/* View switcher on tablet/desktop (mobile < 768px uses bottom bar) */}
+          <div className="hidden md:flex items-center p-0.5 bg-stone-200/70 dark:bg-stone-800 rounded-lg text-xs font-medium">
             <button
               onClick={() => onViewChange('split')}
               className={`px-2 py-1 rounded-md transition-all whitespace-nowrap cursor-pointer ${
@@ -223,7 +223,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                   : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
               }`}
             >
-              <span className="hidden lg:inline">Lienzo & Biblia</span>
+              <span className="hidden lg:inline">{isCellMode ? 'Lienzo & Célula' : 'Lienzo & Biblia'}</span>
               <span className="lg:hidden">Ambos</span>
             </button>
             <button
@@ -245,8 +245,8 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                   : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200'
               }`}
             >
-              <span className="hidden lg:inline">Sólo Biblia</span>
-              <span className="lg:hidden">Biblia</span>
+              <span className="hidden lg:inline">{isCellMode ? 'Sólo Célula' : 'Sólo Biblia'}</span>
+              <span className="lg:hidden">{isCellMode ? 'Célula' : 'Biblia'}</span>
             </button>
           </div>
 

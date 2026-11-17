@@ -13,6 +13,7 @@ import {
   Layers,
   HeartHandshake,
   Maximize2,
+  Users,
 } from 'lucide-react';
 import type { User } from 'firebase/auth';
 import {
@@ -60,10 +61,23 @@ const FirstVisitGoogleModal = React.lazy(() =>
 const AUTO_SAVE_INTERVAL_MS = 90_000; // 1.5 minutos
 const FIRST_VISIT_AUTH_PROMPT_KEY = 'rhema_first_visit_auth_prompt_v1';
 
+const isMobileViewport = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const narrowScreen = window.innerWidth < 768;
+  const mobileUA =
+    typeof navigator !== 'undefined' &&
+    /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  return narrowScreen || (mobileUA && window.innerWidth < 900);
+};
+
 export default function App() {
   const [sermons, setSermons] = useState<SermonNote[]>([]);
   const [sermon, setSermon] = useState<SermonNote>(() => getActiveSermon());
-  const [activeView, setActiveView] = useState<'split' | 'canvas-only' | 'bible-only'>('split');
+  const [isMobile, setIsMobile] = useState<boolean>(() => isMobileViewport());
+  const [activeView, setActiveView] = useState<'split' | 'canvas-only' | 'bible-only'>(() =>
+    isMobileViewport() ? 'bible-only' : 'split'
+  );
+  const [cellLeftView, setCellLeftView] = useState<'cell' | 'bible'>('cell');
   const [isBibleCollapsed, setIsBibleCollapsed] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentTranslation, setCurrentTranslation] = useState('RVR1960');
@@ -147,6 +161,16 @@ export default function App() {
       setIsDarkMode(false);
       document.documentElement.classList.remove('dark');
     }
+
+    const handleResize = () => {
+      const mobileNow = isMobileViewport();
+      setIsMobile(mobileNow);
+      if (mobileNow) {
+        setActiveView((prev) => (prev === 'split' ? 'bible-only' : prev));
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -544,7 +568,9 @@ export default function App() {
         };
       });
 
-      setActiveView('split');
+      if (!isMobileViewport()) {
+        setActiveView('split');
+      }
     },
     [updateSermonInMemory]
   );
@@ -756,7 +782,7 @@ export default function App() {
           updatedAt: Date.now(),
         };
       });
-      setActiveView('split');
+      setActiveView(isMobileViewport() ? 'canvas-only' : 'split');
     },
     [updateSermonInMemory]
   );
@@ -786,6 +812,12 @@ export default function App() {
       category: nextCategory,
       updatedAt: Date.now(),
     }));
+
+    setCellLeftView('cell');
+    if (nextMode === 'cell' && isMobileViewport()) {
+      setActiveView('bible-only');
+      setIsBibleCollapsed(false);
+    }
 
     if (nextMode === 'cell' && !current.cellLesson) {
       if (wasDirtyBefore) {
@@ -862,7 +894,9 @@ export default function App() {
     hasUnsavedChangesRef.current = false;
     setHasUnsavedChanges(false);
     setLastSavedAt(Date.now());
-    setActiveView('split');
+    setCellLeftView('cell');
+    setIsBibleCollapsed(false);
+    setActiveView(isMobileViewport() ? 'bible-only' : 'split');
   }, []);
 
   const handleNavigateToLinkedVerse = useCallback(
@@ -886,11 +920,11 @@ export default function App() {
             current.studyMode === 'cell' || current.category === 'Células de estudio';
           handleSelectPassage(foundBook.id, chapter);
           if (currentlyCell) {
-            handleToggleCellMode();
+            setCellLeftView('bible');
           }
           setIsBibleCollapsed(false);
           setHighlightedVerseId(verse);
-          setActiveView('split');
+          setActiveView(isMobileViewport() ? 'bible-only' : 'split');
 
           setTimeout(() => {
             const el = document.getElementById(`verse-${foundBook.id}-${chapter}-${verse}`);
@@ -901,7 +935,7 @@ export default function App() {
         }
       }
     },
-    [handleSelectPassage, handleToggleCellMode]
+    [handleSelectPassage]
   );
 
   const handleSelectSermon = useCallback(
@@ -910,6 +944,7 @@ export default function App() {
       confirmIfUnsavedChanges('cambiar a otro estudio', () => {
         sermonRef.current = s;
         setSermon(s);
+        setCellLeftView('cell');
         localStorage.setItem('rhema_active_sermon_id_v1', s.id);
         hasUnsavedChangesRef.current = false;
         setHasUnsavedChanges(false);
@@ -935,6 +970,7 @@ export default function App() {
         setSermons(getAllSermons());
         sermonRef.current = newS;
         setSermon(newS);
+        setCellLeftView('cell');
         hasUnsavedChangesRef.current = false;
         setHasUnsavedChanges(false);
         setLastSavedAt(Date.now());
@@ -966,6 +1002,7 @@ export default function App() {
       const active = getActiveSermon();
       sermonRef.current = active;
       setSermon(active);
+      setCellLeftView('cell');
       hasUnsavedChangesRef.current = false;
       setHasUnsavedChanges(false);
     }
@@ -977,6 +1014,7 @@ export default function App() {
         setSermons(getAllSermons());
         sermonRef.current = imported;
         setSermon(imported);
+        setCellLeftView('cell');
         localStorage.setItem('rhema_active_sermon_id_v1', imported.id);
         hasUnsavedChangesRef.current = false;
         setHasUnsavedChanges(false);
@@ -988,9 +1026,10 @@ export default function App() {
   const handleSelectPassageInCellMode = useCallback(
     (bookId: string, chapter: number) => {
       handleSelectPassage(bookId, chapter);
-      handleToggleCellMode();
+      setCellLeftView('bible');
+      setIsBibleCollapsed(false);
     },
-    [handleSelectPassage, handleToggleCellMode]
+    [handleSelectPassage]
   );
 
   const handleOpenSermonsList = useCallback(() => setIsSermonsListOpen(true), []);
@@ -1098,11 +1137,13 @@ export default function App() {
                 isBibleCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             >
-              {isCellMode ? (
+              {isCellMode && cellLeftView === 'cell' ? (
                 <CellLessonReader
                   cellLesson={sermon.cellLesson}
                   onOpenUploadModal={handleRequestOpenCellPdfUpload}
                   onSwitchToSermonMode={handleToggleCellMode}
+                  onOpenBibleInCellMode={() => setCellLeftView('bible')}
+                  onOpenScriptureRef={handleNavigateToLinkedVerse}
                   onSelectPassageInBible={handleSelectPassageInCellMode}
                   onUpdateCard={handleUpdateCard}
                   onCreateQuestionCard={handleCreateCellQuestionCard}
@@ -1123,20 +1164,21 @@ export default function App() {
                   onSelectTranslation={setCurrentTranslation}
                   translations={availableTranslations}
                   onToggleCollapse={handleCollapseBible}
+                  onBackToCellLesson={isCellMode ? () => setCellLeftView('cell') : undefined}
                 />
               )}
             </div>
           </div>
         )}
 
-        {/* Sliding Arrow Tab to Toggle / Slide Bible Panel (Visible on Split View) */}
+        {/* Sliding Arrow Tab to Toggle / Slide Bible Panel (Visible on Desktop/Tablet Split View) */}
         {activeView === 'split' && (
           <button
             onClick={() => setIsBibleCollapsed(!isBibleCollapsed)}
-            className={`absolute top-1/2 -translate-y-1/2 z-30 flex items-center justify-center w-7 h-16 sm:w-6 sm:h-14 bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white shadow-xl hover:shadow-2xl transition-all duration-300 rounded-r-xl border border-l-0 border-amber-600/70 cursor-pointer active:scale-95 group ${
+            className={`hidden md:flex absolute top-1/2 -translate-y-1/2 z-30 items-center justify-center w-6 h-14 bg-gradient-to-r from-amber-700 to-amber-800 hover:from-amber-800 hover:to-amber-900 text-white shadow-xl hover:shadow-2xl transition-all duration-300 rounded-r-xl border border-l-0 border-amber-600/70 cursor-pointer active:scale-95 group ${
               isBibleCollapsed
                 ? 'left-0'
-                : 'left-[calc(100%-28px)] md:left-[400px] lg:left-[460px] xl:left-[500px]'
+                : 'left-[400px] lg:left-[460px] xl:left-[500px]'
             }`}
             title={isBibleCollapsed ? 'Deslizar para abrir la Biblia' : 'Ocultar Biblia para expandir lienzo'}
             aria-label={isBibleCollapsed ? 'Abrir Biblia' : 'Ocultar Biblia'}
@@ -1170,15 +1212,36 @@ export default function App() {
         )}
       </main>
 
-      {/* Mobile & Tablet Quick Bottom Navigation Bar (Hidden on Desktop) */}
-      <nav className="sm:hidden flex items-center justify-around bg-white/95 dark:bg-[#12141A]/95 border-t border-stone-200 dark:border-stone-800 py-1.5 px-2 z-30 backdrop-blur-md">
+      {/* Mobile Quick Bottom Navigation Bar (Visible on < 768px) */}
+      <nav className="md:hidden flex items-center justify-around bg-white/95 dark:bg-[#12141A]/95 border-t border-stone-200 dark:border-stone-800 py-1.5 px-1.5 z-30 backdrop-blur-md shrink-0">
+        {isCellMode && (
+          <button
+            type="button"
+            onClick={() => {
+              setCellLeftView('cell');
+              setActiveView('bible-only');
+              setIsBibleCollapsed(false);
+            }}
+            className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+              activeView === 'bible-only' && cellLeftView === 'cell'
+                ? 'text-emerald-700 dark:text-emerald-400 font-bold'
+                : 'text-stone-500 hover:text-stone-800 dark:text-stone-400'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Célula</span>
+          </button>
+        )}
+
         <button
+          type="button"
           onClick={() => {
+            if (isCellMode) setCellLeftView('bible');
             setActiveView('bible-only');
             setIsBibleCollapsed(false);
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
-            activeView === 'bible-only'
+          className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+            activeView === 'bible-only' && (!isCellMode || cellLeftView === 'bible')
               ? 'text-amber-700 dark:text-amber-400 font-bold'
               : 'text-stone-500 hover:text-stone-800 dark:text-stone-400'
           }`}
@@ -1188,10 +1251,11 @@ export default function App() {
         </button>
 
         <button
+          type="button"
           onClick={() => {
             setActiveView('canvas-only');
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
             activeView === 'canvas-only'
               ? 'text-amber-700 dark:text-amber-400 font-bold'
               : 'text-stone-500 hover:text-stone-800 dark:text-stone-400'
@@ -1202,34 +1266,18 @@ export default function App() {
         </button>
 
         <button
-          onClick={() => {
-            setActiveView('split');
-            setIsBibleCollapsed(false);
-          }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium transition-colors cursor-pointer ${
-            activeView === 'split'
-              ? 'text-amber-700 dark:text-amber-400 font-bold'
-              : 'text-stone-500 hover:text-stone-800 dark:text-stone-400'
-          }`}
-        >
-          <div className="flex items-center gap-0.5">
-            <BookOpen className="w-3.5 h-3.5" />
-            <Layers className="w-3.5 h-3.5" />
-          </div>
-          <span>Dividida</span>
-        </button>
-
-        <button
+          type="button"
           onClick={handleOpenReflections}
-          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium text-stone-500 hover:text-stone-800 dark:text-stone-400 transition-colors cursor-pointer"
+          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-lg text-[10px] font-medium text-stone-500 hover:text-stone-800 dark:text-stone-400 transition-colors cursor-pointer"
         >
           <HeartHandshake className="w-4 h-4 text-pink-500" />
           <span>Diario</span>
         </button>
 
         <button
+          type="button"
           onClick={handleOpenPresentationMode}
-          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[10px] font-medium text-stone-500 hover:text-stone-800 dark:text-stone-400 transition-colors cursor-pointer"
+          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-lg text-[10px] font-medium text-stone-500 hover:text-stone-800 dark:text-stone-400 transition-colors cursor-pointer"
         >
           <Maximize2 className="w-4 h-4 text-amber-500" />
           <span>Modo Culto</span>
@@ -1285,6 +1333,13 @@ export default function App() {
             onClose={() => setIsQuickSearchOpen(false)}
             onSelectPassage={(bookId, chapter, verse) => {
               handleSelectPassage(bookId, chapter);
+              if (isCellMode) {
+                setCellLeftView('bible');
+              }
+              if (isMobile) {
+                setActiveView('bible-only');
+              }
+              setIsBibleCollapsed(false);
               if (verse) {
                 setHighlightedVerseId(verse);
               }
