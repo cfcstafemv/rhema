@@ -171,15 +171,18 @@ export const Header: React.FC<HeaderProps> = React.memo(({
           )}
 
           {onOpenPrivacy && (
-            <button
-              type="button"
-              onClick={onOpenPrivacy}
+            <a
+              href="/privacidad.html"
+              onClick={(e) => {
+                e.preventDefault();
+                onOpenPrivacy();
+              }}
               className="flex items-center gap-1 hover:text-stone-900 dark:hover:text-stone-100 text-stone-500 dark:text-stone-400 transition-colors whitespace-nowrap cursor-pointer py-0.5"
               title="Ver Política de Privacidad de Rhema"
             >
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600/80 dark:text-emerald-400/80 shrink-0" />
               <span>Privacidad</span>
-            </button>
+            </a>
           )}
         </nav>
 

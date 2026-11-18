@@ -4,6 +4,7 @@ import { BibleReader } from './components/BibleReader';
 import { CanvasBoard } from './components/CanvasBoard';
 import { CellLessonReader } from './components/CellLessonReader';
 import { UnsavedChangesModal } from './components/UnsavedChangesModal';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import type { ParsedCellLesson } from './services/pdfService';
 import { SermonNote, FloatingCard, VerseHighlight, CardType, PersonalReflection, SermonCategory } from './types';
 import {
@@ -51,15 +52,20 @@ const CellPdfUploadModal = React.lazy(() =>
 const DriveSyncModal = React.lazy(() =>
   import('./components/DriveSyncModal').then((m) => ({ default: m.DriveSyncModal }))
 );
-const PrivacyPolicyModal = React.lazy(() =>
-  import('./components/PrivacyPolicyModal').then((m) => ({ default: m.PrivacyPolicyModal }))
-);
 const FirstVisitGoogleModal = React.lazy(() =>
   import('./components/FirstVisitGoogleModal').then((m) => ({ default: m.FirstVisitGoogleModal }))
 );
 
 const AUTO_SAVE_INTERVAL_MS = 90_000; // 1.5 minutos
 const FIRST_VISIT_AUTH_PROMPT_KEY = 'rhema_first_visit_auth_prompt_v1';
+
+const isPrivacyQueryUrl = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.location.search.includes('privacidad') ||
+    window.location.hash.toLowerCase().includes('privacidad')
+  );
+};
 
 const isMobileViewport = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -89,19 +95,14 @@ export default function App() {
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [isCellPdfUploadOpen, setIsCellPdfUploadOpen] = useState(false);
   const [isDriveSyncOpen, setIsDriveSyncOpen] = useState(false);
-  const [isPrivacyOpen, setIsPrivacyOpen] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return (
-      window.location.search.includes('privacidad') ||
-      window.location.hash.toLowerCase().includes('privacidad')
-    );
-  });
+  const [isPrivacyStandalone] = useState<boolean>(() => isPrivacyQueryUrl());
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState<boolean>(() => isPrivacyQueryUrl());
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [hasDriveToken, setHasDriveToken] = useState(false);
   const [isAuthResolved, setIsAuthResolved] = useState(false);
   const [isFirstVisitAuthOpen, setIsFirstVisitAuthOpen] = useState(false);
   const [highlightedVerseId, setHighlightedVerseId] = useState<number | null>(null);
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState<boolean>(() => !isPrivacyQueryUrl());
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   // Save & dirty-tracking state
@@ -136,8 +137,12 @@ export default function App() {
     }, durationMs);
   }, []);
 
-  // Initial splash screen with bounce effect
+  // Initial splash screen with bounce effect (skipped if opened directly to ?privacidad=1)
   useEffect(() => {
+    if (isPrivacyQueryUrl()) {
+      setShowSplash(false);
+      return;
+    }
     triggerSplash(900);
     return () => {
       if (splashTimerRef.current) clearTimeout(splashTimerRef.current);
@@ -1376,13 +1381,6 @@ export default function App() {
           />
         )}
 
-        {isPrivacyOpen && (
-          <PrivacyPolicyModal
-            isOpen={isPrivacyOpen}
-            onClose={() => setIsPrivacyOpen(false)}
-          />
-        )}
-
         {isFirstVisitAuthOpen && (
           <FirstVisitGoogleModal
             isOpen={isFirstVisitAuthOpen}
@@ -1400,6 +1398,22 @@ export default function App() {
           />
         )}
       </Suspense>
+
+      {isPrivacyOpen && (
+        <PrivacyPolicyModal
+          isOpen={isPrivacyOpen}
+          isStandalonePage={isPrivacyStandalone}
+          onClose={() => {
+            setIsPrivacyOpen(false);
+            if (isPrivacyStandalone && typeof window !== 'undefined') {
+              const url = new URL(window.location.href);
+              url.searchParams.delete('privacidad');
+              if (url.hash.toLowerCase().includes('privacidad')) url.hash = '';
+              window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+            }
+          }}
+        />
+      )}
 
       {/* Save-before-leaving / switching modal */}
       <UnsavedChangesModal

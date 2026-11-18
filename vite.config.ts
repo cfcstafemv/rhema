@@ -11,7 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['assets/aistudio/logoRHEMA_4329ba63.jpg'],
+        includeAssets: ['assets/aistudio/logoRHEMA_4329ba63.jpg', 'privacidad.html'],
         manifest: {
           id: '/',
           name: 'Rhema — Notas de Prédica y Lienzo Bíblico',
@@ -40,6 +40,7 @@ export default defineConfig(() => {
         workbox: {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,woff,woff2}'],
+          navigateFallbackDenylist: [/^\/privacidad\.html/],
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
