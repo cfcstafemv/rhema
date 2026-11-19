@@ -15,6 +15,7 @@ import {
   HeartHandshake,
   Check,
   RotateCcw,
+  MonitorPlay,
 } from 'lucide-react';
 import { CellLessonData, FloatingCard } from '../types';
 
@@ -57,6 +58,7 @@ interface EditableCellQuestionItemProps {
   onUpdateCard?: (id: string, updates: Partial<FloatingCard>) => void;
   onCreateQuestionCard?: (idx: number, questionTitle: string, content: string) => void;
   onDirty?: () => void;
+  onProjectQuestion?: (questionText: string) => void;
 }
 
 const EditableCellQuestionItem: React.FC<EditableCellQuestionItemProps> = ({
@@ -67,6 +69,7 @@ const EditableCellQuestionItem: React.FC<EditableCellQuestionItemProps> = ({
   onUpdateCard,
   onCreateQuestionCard,
   onDirty,
+  onProjectQuestion,
 }) => {
   const rawIncoming = matchingCard ? matchingCard.content : '';
   const initialContent = isDefaultQuestionPrompt(rawIncoming) ? '' : rawIncoming;
@@ -139,13 +142,26 @@ const EditableCellQuestionItem: React.FC<EditableCellQuestionItemProps> = ({
 
   return (
     <div className="p-3 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-2xs space-y-2 transition-colors focus-within:border-emerald-500/70">
-      <div className="flex items-start gap-2 min-w-0">
-        <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-          {idx + 1}
-        </span>
-        <h4 className={`font-sans font-bold text-stone-900 dark:text-stone-100 break-words ${TITLE_FONT_SIZE_CLASSES[fontSize]}`}>
-          {displayQuestion}
-        </h4>
+      <div className="flex items-start justify-between gap-2 min-w-0">
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+            {idx + 1}
+          </span>
+          <h4 className={`font-sans font-bold text-stone-900 dark:text-stone-100 break-words ${TITLE_FONT_SIZE_CLASSES[fontSize]}`}>
+            {displayQuestion}
+          </h4>
+        </div>
+        {onProjectQuestion && (
+          <button
+            type="button"
+            onClick={() => onProjectQuestion(displayQuestion)}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/70 text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/80 text-[10px] font-semibold transition-colors cursor-pointer shrink-0"
+            title="Proyectar esta pregunta en 2ª pantalla (sin mostrar respuestas del grupo)"
+          >
+            <MonitorPlay className="w-3 h-3" />
+            <span>Proyectar</span>
+          </button>
+        )}
       </div>
 
       <textarea
@@ -172,6 +188,8 @@ interface CellLessonReaderProps {
   onUpdateCard?: (id: string, updates: Partial<FloatingCard>) => void;
   onCreateQuestionCard?: (idx: number, questionTitle: string, content: string) => void;
   onDirty?: () => void;
+  onProjectScripture?: (ref: string, quoteText?: string) => void;
+  onProjectQuestion?: (questionText: string) => void;
   cards: FloatingCard[];
 }
 
@@ -186,6 +204,8 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
   onUpdateCard,
   onCreateQuestionCard,
   onDirty,
+  onProjectScripture,
+  onProjectQuestion,
   cards,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -416,6 +436,17 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
                           {ref}
                         </span>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {onProjectScripture && (
+                            <button
+                              type="button"
+                              onClick={() => onProjectScripture(ref, matchingCard?.linkedQuote)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-semibold transition-colors cursor-pointer"
+                              title={`Proyectar ${ref} en 2ª pantalla`}
+                            >
+                              <MonitorPlay className="w-3 h-3" />
+                              <span>Proyectar</span>
+                            </button>
+                          )}
                           {onOpenScriptureRef && (
                             <button
                               type="button"
@@ -484,6 +515,7 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
                       onUpdateCard={onUpdateCard}
                       onCreateQuestionCard={onCreateQuestionCard}
                       onDirty={onDirty}
+                      onProjectQuestion={onProjectQuestion}
                     />
                   );
                 })}
@@ -571,11 +603,22 @@ export const CellLessonReader: React.FC<CellLessonReaderProps> = React.memo(({
                     key={pIdx}
                     className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200/80 dark:border-emerald-900 space-y-1.5 my-2 break-words overflow-hidden"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider font-sans flex items-center gap-1.5">
                         <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
                         <span>Pregunta para Dialogar</span>
                       </span>
+                      {onProjectQuestion && (
+                        <button
+                          type="button"
+                          onClick={() => onProjectQuestion(cleanPara)}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-semibold transition-colors cursor-pointer shrink-0"
+                          title="Proyectar pregunta en 2ª pantalla"
+                        >
+                          <MonitorPlay className="w-3 h-3" />
+                          <span>Proyectar</span>
+                        </button>
+                      )}
                     </div>
                     <p className="text-stone-900 dark:text-stone-100 font-sans font-bold leading-snug break-words whitespace-pre-line">
                       {cleanPara}

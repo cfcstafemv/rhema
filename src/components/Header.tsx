@@ -17,6 +17,7 @@ import {
   Save,
   Cloud,
   ShieldCheck,
+  MonitorPlay,
 } from 'lucide-react';
 import { SermonNote, SermonCategory, SERMON_CATEGORIES } from '../types';
 
@@ -45,6 +46,9 @@ interface HeaderProps {
   googleUserName?: string | null;
   isDriveConnected?: boolean;
   onOpenPrivacy?: () => void;
+  onOpenProjector?: () => void;
+  isProjectorConnected?: boolean;
+  hasActiveProjectorSlide?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = React.memo(({
@@ -72,6 +76,9 @@ export const Header: React.FC<HeaderProps> = React.memo(({
   googleUserName,
   isDriveConnected = false,
   onOpenPrivacy,
+  onOpenProjector,
+  isProjectorConnected = false,
+  hasActiveProjectorSlide = false,
 }) => {
   const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [metaTitle, setMetaTitle] = useState(sermon.title);
@@ -151,6 +158,29 @@ export const Header: React.FC<HeaderProps> = React.memo(({
             <Maximize2 className="w-3.5 h-3.5 text-amber-500 shrink-0" />
             <span>Modo Presentación</span>
           </button>
+
+          {onOpenProjector && (
+            <button
+              type="button"
+              onClick={onOpenProjector}
+              className={`flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer px-2 py-1 rounded-lg ${
+                isProjectorConnected || hasActiveProjectorSlide
+                  ? 'bg-amber-100/90 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-semibold border border-amber-300 dark:border-amber-700/80 shadow-2xs'
+                  : 'hover:text-amber-700 dark:hover:text-amber-400 py-0.5'
+              }`}
+              title="Proyectar versículos, tarjetas o preguntas en una 2ª pantalla (PC → Proyector)"
+            >
+              <MonitorPlay className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>Proyector</span>
+              {(isProjectorConnected || hasActiveProjectorSlide) && (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isProjectorConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  }`}
+                />
+              )}
+            </button>
+          )}
 
           {onToggleCellMode && (
             <button

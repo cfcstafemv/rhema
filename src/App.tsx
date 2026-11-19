@@ -15,7 +15,17 @@ import {
   HeartHandshake,
   Maximize2,
   Users,
+  MonitorPlay,
+  EyeOff,
+  Sparkles,
 } from 'lucide-react';
+import { ProjectorScreen } from './components/ProjectorScreen';
+import {
+  ProjectorSlidePayload,
+  broadcastProjectorSlide,
+  getLastProjectorSlide,
+  subscribeProjectorPresence,
+} from './services/projectorSync';
 import type { User } from 'firebase/auth';
 import {
   getActiveSermon,
@@ -55,9 +65,17 @@ const DriveSyncModal = React.lazy(() =>
 const FirstVisitGoogleModal = React.lazy(() =>
   import('./components/FirstVisitGoogleModal').then((m) => ({ default: m.FirstVisitGoogleModal }))
 );
+const ProjectorModal = React.lazy(() =>
+  import('./components/ProjectorModal').then((m) => ({ default: m.ProjectorModal }))
+);
 
 const AUTO_SAVE_INTERVAL_MS = 90_000; // 1.5 minutos
 const FIRST_VISIT_AUTH_PROMPT_KEY = 'rhema_first_visit_auth_prompt_v1';
+
+const isProjectorQueryUrl = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return new URLSearchParams(window.location.search).has('proyector');
+};
 
 const isPrivacyQueryUrl = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -76,7 +94,7 @@ const isMobileViewport = (): boolean => {
   return narrowScreen || (mobileUA && window.innerWidth < 900);
 };
 
-export default function App() {
+function MainStudioApp() {
   const [sermons, setSermons] = useState<SermonNote[]>([]);
   const [sermon, setSermon] = useState<SermonNote>(() => getActiveSermon());
   const [isMobile, setIsMobile] = useState<boolean>(() => isMobileViewport());
@@ -97,6 +115,19 @@ export default function App() {
   const [isDriveSyncOpen, setIsDriveSyncOpen] = useState(false);
   const [isPrivacyStandalone] = useState<boolean>(() => isPrivacyQueryUrl());
   const [isPrivacyOpen, setIsPrivacyOpen] = useState<boolean>(() => isPrivacyQueryUrl());
+  const [isProjectorModalOpen, setIsProjectorModalOpen] = useState(false);
+  const [isProjectorConnected, setIsProjectorConnected] = useState(false);
+  const [hasProjectedInSession, setHasProjectedInSession] = useState(false);
+  const [currentProjectedSlide, setCurrentProjectedSlide] = useState<ProjectorSlidePayload>(() => {
+    return (
+      getLastProjectorSlide() || {
+        kind: 'idle',
+        sermonTitle: 'Rhema',
+        sermonScripture: 'Estudio & Lienzo Bíblico',
+        updatedAt: Date.now(),
+      }
+    );
+  });
   const [googleUser, setGoogleUser] = useState<User | null>(null);
   const [hasDriveToken, setHasDriveToken] = useState(false);
   const [isAuthResolved, setIsAuthResolved] = useState(false);
@@ -1065,6 +1096,138 @@ export default function App() {
 
   const handleReplaySplash = useCallback(() => triggerSplash(1600), [triggerSplash]);
 
+  useEffect(() => {
+    const unsub = subscribeProjectorPresence(() => {
+      setIsProjectorConnected(true);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleProjectSlide = useCallback(
+    (slide: Omit<ProjectorSlidePayload, 'updatedAt'>) => {
+      const sent = broadcastProjectorSlide(slide);
+      setCurrentProjectedSlide(sent);
+      setHasProjectedInSession(true);
+    },
+    []
+  );
+
+  const handleProjectVerse = useCallback(
+    (verseText: string, ref: string, translation: string) => {
+      handleProjectSlide({
+        kind: 'verse',
+        reference: ref,
+        content: verseText,
+        translation,
+        sermonTitle: sermonRef.current.title,
+        sermonScripture: sermonRef.current.mainScripture,
+      });
+    },
+    [handleProjectSlide]
+  );
+
+  const handleProjectCard = useCallback(
+    (card: FloatingCard) => {
+      const current = sermonRef.current;
+      const isQuestion =
+        card.customTypeLabel === 'Pregunta de Diálogo' ||
+        card.tags?.includes('Pregunta de Diálogo');
+
+      if (isQuestion) {
+        handleProjectSlide({
+          kind: 'question',
+          title: 'Pregunta para Dialogar',
+          content: card.title,
+          sermonTitle: current.title,
+          sermonScripture: current.mainScripture,
+        });
+        return;
+      }
+
+      const isVerseCard =
+        (card.customTypeLabel === 'Cita Bíblica' || card.tags?.includes('Cita Bíblica')) &&
+        Boolean(card.linkedVerseRef) &&
+        Boolean(card.linkedQuote);
+
+      if (isVerseCard) {
+        handleProjectSlide({
+          kind: 'verse',
+          reference: card.linkedVerseRef,
+          content: card.linkedQuote || card.content.replace(/^[«"]|[»"]$/g, ''),
+          sermonTitle: current.title,
+          sermonScripture: current.mainScripture,
+        });
+        return;
+      }
+
+      handleProjectSlide({
+        kind: 'card',
+        title: card.title,
+        content: card.content,
+        reference: card.linkedVerseRef,
+        quote: card.linkedQuote,
+        imageUrl: card.imageUrl,
+        accentColor: card.color,
+        sermonTitle: current.title,
+        sermonScripture: current.mainScripture,
+      });
+    },
+    [handleProjectSlide]
+  );
+
+  const handleProjectCellScripture = useCallback(
+    async (ref: string, quoteText?: string) => {
+      const current = sermonRef.current;
+      if (quoteText && quoteText.trim()) {
+        handleProjectSlide({
+          kind: 'verse',
+          reference: ref,
+          content: quoteText.trim(),
+          sermonTitle: current.title,
+          sermonScripture: current.mainScripture,
+        });
+        return;
+      }
+
+      try {
+        const { fetchVerseRangeText } = await import('./services/pdfService');
+        const fetched = await fetchVerseRangeText(ref);
+        handleProjectSlide({
+          kind: 'verse',
+          reference: ref,
+          content: fetched || ref,
+          sermonTitle: current.title,
+          sermonScripture: current.mainScripture,
+        });
+      } catch {
+        handleProjectSlide({
+          kind: 'verse',
+          reference: ref,
+          content: ref,
+          sermonTitle: current.title,
+          sermonScripture: current.mainScripture,
+        });
+      }
+    },
+    [handleProjectSlide]
+  );
+
+  const handleProjectQuestion = useCallback(
+    (questionText: string) => {
+      const current = sermonRef.current;
+      handleProjectSlide({
+        kind: 'question',
+        title: 'Pregunta para Dialogar',
+        content: questionText,
+        sermonTitle: current.title,
+        sermonScripture: current.mainScripture,
+      });
+    },
+    [handleProjectSlide]
+  );
+
+  const handleOpenProjector = useCallback(() => setIsProjectorModalOpen(true), []);
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#FBF9F5] dark:bg-[#0E1015] text-stone-900 dark:text-stone-100 relative">
       {showSplash && (
@@ -1123,6 +1286,13 @@ export default function App() {
         googleUserName={googleUser?.displayName || googleUser?.email}
         isDriveConnected={Boolean(googleUser && hasDriveToken)}
         onOpenPrivacy={handleOpenPrivacy}
+        onOpenProjector={handleOpenProjector}
+        isProjectorConnected={isProjectorConnected}
+        hasActiveProjectorSlide={
+          hasProjectedInSession &&
+          currentProjectedSlide.kind !== 'idle' &&
+          currentProjectedSlide.kind !== 'blackout'
+        }
       />
 
       <main className="flex-1 flex overflow-hidden relative">
@@ -1153,6 +1323,8 @@ export default function App() {
                   onUpdateCard={handleUpdateCard}
                   onCreateQuestionCard={handleCreateCellQuestionCard}
                   onDirty={markDirty}
+                  onProjectScripture={handleProjectCellScripture}
+                  onProjectQuestion={handleProjectQuestion}
                   cards={sermon.cards}
                 />
               ) : (
@@ -1170,6 +1342,7 @@ export default function App() {
                   translations={availableTranslations}
                   onToggleCollapse={handleCollapseBible}
                   onBackToCellLesson={isCellMode ? () => setCellLeftView('cell') : undefined}
+                  onProjectVerse={handleProjectVerse}
                 />
               )}
             </div>
@@ -1209,10 +1382,60 @@ export default function App() {
               onDeleteCard={handleDeleteCard}
               onAddCard={handleAddCard}
               onNavigateToLinkedVerse={handleNavigateToLinkedVerse}
+              onProjectCard={handleProjectCard}
               onApplyTemplate={handleApplyTemplate}
               isSplitView={activeView === 'split' && !isBibleCollapsed}
               isCellMode={isCellMode}
             />
+          </div>
+        )}
+
+        {/* Quick Live Projector Controls (Only visible when projector window is connected or projecting in this session) */}
+        {(isProjectorConnected || hasProjectedInSession) && !isPresentationOpen && (
+          <div className="fixed bottom-16 md:bottom-4 right-4 z-30 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-900/95 text-stone-100 border border-stone-700/80 shadow-xl backdrop-blur-md text-[11px] font-sans">
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                isProjectorConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+            <span className="max-w-[130px] truncate text-stone-300 font-medium">
+              {currentProjectedSlide.kind === 'blackout'
+                ? 'Negro'
+                : currentProjectedSlide.kind === 'idle'
+                ? 'Portada'
+                : currentProjectedSlide.reference || currentProjectedSlide.title || 'En vivo'}
+            </span>
+            <button
+              type="button"
+              onClick={() =>
+                handleProjectSlide({
+                  kind: 'idle',
+                  sermonTitle: sermon.title,
+                  sermonScripture: sermon.mainScripture,
+                })
+              }
+              className="p-1 rounded-lg hover:bg-stone-800 text-amber-400 transition-colors cursor-pointer"
+              title="Mostrar portada en el proyector"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleProjectSlide({ kind: 'blackout' })}
+              className="p-1 rounded-lg hover:bg-stone-800 text-stone-300 transition-colors cursor-pointer"
+              title="Poner proyector en negro"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenProjector}
+              className="px-2 py-0.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold transition-colors cursor-pointer flex items-center gap-1"
+              title="Abrir panel de proyector"
+            >
+              <MonitorPlay className="w-3 h-3" />
+              <span>Panel</span>
+            </button>
           </div>
         )}
       </main>
@@ -1307,6 +1530,18 @@ export default function App() {
             onClose={() => setIsPresentationOpen(false)}
             sermon={sermon}
             currentTranslation={currentTranslation}
+            onProjectSlide={handleProjectSlide}
+          />
+        )}
+
+        {isProjectorModalOpen && (
+          <ProjectorModal
+            isOpen={isProjectorModalOpen}
+            onClose={() => setIsProjectorModalOpen(false)}
+            sermon={sermon}
+            currentSlide={currentProjectedSlide}
+            isProjectorConnected={isProjectorConnected}
+            onProjectSlide={handleProjectSlide}
           />
         )}
 
@@ -1441,4 +1676,11 @@ export default function App() {
       />
     </div>
   );
+}
+
+export default function App() {
+  if (isProjectorQueryUrl()) {
+    return <ProjectorScreen />;
+  }
+  return <MainStudioApp />;
 }

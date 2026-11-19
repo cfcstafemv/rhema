@@ -33,6 +33,7 @@ interface CanvasBoardProps {
   onDeleteCard: (id: string) => void;
   onAddCard: (cardType: CardType) => void;
   onNavigateToLinkedVerse?: (verseRef: string) => void;
+  onProjectCard?: (card: FloatingCard) => void;
   isSplitView: boolean;
   isCellMode?: boolean;
 }
@@ -47,6 +48,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = React.memo(({
   onDeleteCard,
   onAddCard,
   onNavigateToLinkedVerse,
+  onProjectCard,
   onApplyTemplate,
   isSplitView,
   isCellMode = false,
@@ -493,6 +495,7 @@ export const CanvasBoard: React.FC<CanvasBoardProps> = React.memo(({
             onDelete={onDeleteCard}
             onBringToFront={handleBringToFront}
             onNavigateToLinkedVerse={onNavigateToLinkedVerse}
+            onProjectCard={onProjectCard}
             zoomScale={zoom}
             typeLabels={typeLabels}
             onOpenEditDefaults={handleOpenEditDefaults}

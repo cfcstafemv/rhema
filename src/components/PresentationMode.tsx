@@ -6,17 +6,20 @@ import {
   BookOpen, 
   Sparkles, 
   HeartHandshake, 
-  Maximize2
+  Maximize2,
+  MonitorPlay,
 } from 'lucide-react';
-import { BibleVerse, SermonNote } from '../types';
+import { BibleVerse, FloatingCard, SermonNote } from '../types';
 import { getBibleVerses } from '../data/bibleData';
 import { getOrFetchChapterVerses } from '../services/bibleService';
+import type { ProjectorSlidePayload } from '../services/projectorSync';
 
 interface PresentationModeProps {
   isOpen: boolean;
   onClose: () => void;
   sermon: SermonNote;
   currentTranslation?: string;
+  onProjectSlide?: (slide: Omit<ProjectorSlidePayload, 'updatedAt'>) => void;
 }
 
 export const PresentationMode: React.FC<PresentationModeProps> = ({
@@ -24,6 +27,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   onClose,
   sermon,
   currentTranslation = 'RVR1960',
+  onProjectSlide,
 }) => {
   const [activeTab, setActiveTab] = useState<'scripture' | 'deck' | 'reflection'>('deck');
   const [activeCardIndex, setActiveCardIndex] = useState(0);
@@ -61,6 +65,52 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
   if (!isOpen) return null;
 
   const currentCard = sermon.cards[activeCardIndex] || sermon.cards[0];
+
+  const handleProjectCard = (card: FloatingCard) => {
+    if (!onProjectSlide) return;
+    const isQuestion =
+      card.customTypeLabel === 'Pregunta de Diálogo' ||
+      card.tags?.includes('Pregunta de Diálogo');
+
+    if (isQuestion) {
+      onProjectSlide({
+        kind: 'question',
+        title: 'Pregunta para Dialogar',
+        content: card.title,
+        sermonTitle: sermon.title,
+        sermonScripture: sermon.mainScripture,
+      });
+      return;
+    }
+
+    const isVerseCard =
+      (card.customTypeLabel === 'Cita Bíblica' || card.tags?.includes('Cita Bíblica')) &&
+      Boolean(card.linkedVerseRef) &&
+      Boolean(card.linkedQuote);
+
+    if (isVerseCard) {
+      onProjectSlide({
+        kind: 'verse',
+        reference: card.linkedVerseRef,
+        content: card.linkedQuote || card.content.replace(/^[«"]|[»"]$/g, ''),
+        sermonTitle: sermon.title,
+        sermonScripture: sermon.mainScripture,
+      });
+      return;
+    }
+
+    onProjectSlide({
+      kind: 'card',
+      title: card.title,
+      content: card.content,
+      reference: card.linkedVerseRef,
+      quote: card.linkedQuote,
+      imageUrl: card.imageUrl,
+      accentColor: card.color,
+      sermonTitle: sermon.title,
+      sermonScripture: sermon.mainScripture,
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0F1117] text-stone-100 flex flex-col overflow-hidden animate-in fade-in duration-150">
@@ -193,7 +243,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
               className="w-full bg-[#181C27] border rounded-2xl p-5 sm:p-8 lg:p-10 shadow-2xl relative transition-all"
               style={{ borderColor: `${currentCard.color}60` }}
             >
-              {/* Type Accent Tag */}
+              {/* Type Accent Tag & Quick Project */}
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <span 
                   className="text-xs uppercase tracking-widest font-sans font-bold flex items-center gap-1.5 px-2.5 py-1 rounded-md"
@@ -203,11 +253,24 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
                   <span>Punto {activeCardIndex + 1} de {sermon.cards.length}</span>
                 </span>
 
-                {currentCard.linkedVerseRef && (
-                  <span className="text-xs font-serif text-stone-400 italic">
-                    {currentCard.linkedVerseRef}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {currentCard.linkedVerseRef && (
+                    <span className="text-xs font-serif text-stone-400 italic">
+                      {currentCard.linkedVerseRef}
+                    </span>
+                  )}
+                  {onProjectSlide && (
+                    <button
+                      type="button"
+                      onClick={() => handleProjectCard(currentCard)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                      title="Enviar este punto a la ventana del proyector"
+                    >
+                      <MonitorPlay className="w-3.5 h-3.5" />
+                      <span>Proyectar</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Title */}
@@ -303,19 +366,40 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({
                 );
 
                 return (
-                  <p key={v.verse} className="flex items-start gap-3">
-                    <span className="font-mono text-xs font-bold text-amber-500 pt-1 shrink-0">
-                      {v.verse}
-                    </span>
-                    <span 
-                      className={`transition-colors ${
-                        hl ? 'p-1 rounded font-medium' : ''
-                      }`}
-                      style={hl ? { backgroundColor: `${hl.color}25`, borderBottom: `2px solid ${hl.color}` } : {}}
-                    >
-                      {v.text}
-                    </span>
-                  </p>
+                  <div key={v.verse} className="flex items-start justify-between gap-3 group">
+                    <p className="flex items-start gap-3 flex-1">
+                      <span className="font-mono text-xs font-bold text-amber-500 pt-1 shrink-0">
+                        {v.verse}
+                      </span>
+                      <span 
+                        className={`transition-colors ${
+                          hl ? 'p-1 rounded font-medium' : ''
+                        }`}
+                        style={hl ? { backgroundColor: `${hl.color}25`, borderBottom: `2px solid ${hl.color}` } : {}}
+                      >
+                        {v.text}
+                      </span>
+                    </p>
+                    {onProjectSlide && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onProjectSlide({
+                            kind: 'verse',
+                            reference: `${v.bookName} ${v.chapter}:${v.verse}`,
+                            content: v.text,
+                            translation: currentTranslation,
+                            sermonTitle: sermon.title,
+                            sermonScripture: sermon.mainScripture,
+                          })
+                        }
+                        className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 p-1.5 rounded-lg text-stone-400 hover:text-amber-400 hover:bg-stone-800 transition-all cursor-pointer shrink-0"
+                        title={`Proyectar ${v.bookName} ${v.chapter}:${v.verse}`}
+                      >
+                        <MonitorPlay className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>

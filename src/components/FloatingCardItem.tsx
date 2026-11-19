@@ -12,7 +12,8 @@ import {
   Compass,
   Palette,
   ExternalLink,
-  PenLine
+  PenLine,
+  MonitorPlay,
 } from 'lucide-react';
 import { FloatingCard, CardType } from '../types';
 import { CARD_TYPES } from '../data/bibleData';
@@ -27,6 +28,7 @@ interface FloatingCardItemProps {
   typeLabels?: Record<CardType, string>;
   onOpenEditDefaults?: () => void;
   onDirty?: () => void;
+  onProjectCard?: (card: FloatingCard) => void;
 }
 
 const COLOR_OPTIONS = [
@@ -49,6 +51,7 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = React.memo(({
   typeLabels,
   onOpenEditDefaults,
   onDirty,
+  onProjectCard,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -398,7 +401,24 @@ export const FloatingCardItem: React.FC<FloatingCardItemProps> = React.memo(({
           </select>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 ml-2">
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {onProjectCard && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onProjectCard(card);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="p-1.5 text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50 rounded-md transition-colors no-drag cursor-pointer"
+              title="Proyectar esta tarjeta en 2ª pantalla"
+              aria-label="Proyectar tarjeta"
+            >
+              <MonitorPlay className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {/* Color palette toggle */}
           <div className="relative">
             <button

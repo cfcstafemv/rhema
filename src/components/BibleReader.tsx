@@ -30,6 +30,7 @@ import {
   ExternalLink,
   ArrowRightLeft,
   Users,
+  MonitorPlay,
 } from 'lucide-react';
 import { VerseVersionComparatorModal } from './VerseVersionComparatorModal';
 import {
@@ -109,6 +110,7 @@ interface BibleReaderProps {
   translations?: Array<{ id: string; name: string; shortName: string; description: string }>;
   onToggleCollapse?: () => void;
   onBackToCellLesson?: () => void;
+  onProjectVerse?: (verseText: string, ref: string, translation: string) => void;
 }
 
 export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
@@ -125,6 +127,7 @@ export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
   translations,
   onToggleCollapse,
   onBackToCellLesson,
+  onProjectVerse,
 }) => {
   const [searchBook, setSearchBook] = useState('');
   const [isBookDropdownOpen, setIsBookDropdownOpen] = useState(false);
@@ -555,6 +558,31 @@ export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
     }
 
     onCreateLinkedCard(hlId, textToHighlight, ref, cardType);
+    setMenuPosition(null);
+    setSelectedText('');
+    setActiveVerseForMenu(null);
+    setActiveVersesForMenu([]);
+
+    if (window.getSelection) {
+      window.getSelection()?.removeAllRanges();
+    }
+  };
+
+  const handleProjectSelection = () => {
+    if (!activeVerseForMenu || !onProjectVerse) return;
+
+    const targetVerses = activeVersesForMenu.length > 0 ? activeVersesForMenu : [activeVerseForMenu];
+    const firstVerse = targetVerses[0];
+    const lastVerse = targetVerses[targetVerses.length - 1];
+
+    const ref =
+      firstVerse.verse === lastVerse.verse
+        ? `${firstVerse.bookName} ${firstVerse.chapter}:${firstVerse.verse}`
+        : `${firstVerse.bookName} ${firstVerse.chapter}:${firstVerse.verse}-${lastVerse.verse}`;
+
+    const textToProject = (selectedText || targetVerses.map((v) => v.text).join(' ')).trim();
+    onProjectVerse(textToProject, ref, currentTranslation);
+
     setMenuPosition(null);
     setSelectedText('');
     setActiveVerseForMenu(null);
@@ -1137,27 +1165,48 @@ export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveVerseForMenu(v);
-                    setActiveVersesForMenu([v]);
-                    setSelectedText(v.text);
-                    setSelectedHighlightId(null);
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                    const placeAbove = rect.top > 210;
-                    setMenuPosition({
-                      x: Math.min(Math.max(16, rect.left - 180), window.innerWidth - 340),
-                      y: placeAbove ? rect.top - 160 : rect.bottom + 8,
-                    });
-                  }}
-                  className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 transition-opacity p-1.5 text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 cursor-pointer verse-highlight-trigger shrink-0"
-                  title="Resaltar versículo"
-                  aria-label={`Resaltar versículo ${v.verse}`}
-                >
-                  <Highlighter className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  {onProjectVerse && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onProjectVerse(
+                          v.text,
+                          `${v.bookName} ${v.chapter}:${v.verse}`,
+                          currentTranslation
+                        );
+                      }}
+                      className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 transition-opacity p-1.5 text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 cursor-pointer shrink-0"
+                      title={`Proyectar ${v.bookName} ${v.chapter}:${v.verse} en 2ª pantalla`}
+                      aria-label={`Proyectar versículo ${v.verse}`}
+                    >
+                      <MonitorPlay className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveVerseForMenu(v);
+                      setActiveVersesForMenu([v]);
+                      setSelectedText(v.text);
+                      setSelectedHighlightId(null);
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      const placeAbove = rect.top > 210;
+                      setMenuPosition({
+                        x: Math.min(Math.max(16, rect.left - 180), window.innerWidth - 340),
+                        y: placeAbove ? rect.top - 160 : rect.bottom + 8,
+                      });
+                    }}
+                    className="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100 transition-opacity p-1.5 text-stone-400 hover:text-amber-700 dark:hover:text-amber-400 cursor-pointer verse-highlight-trigger shrink-0"
+                    title="Resaltar versículo"
+                    aria-label={`Resaltar versículo ${v.verse}`}
+                  >
+                    <Highlighter className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -1283,6 +1332,18 @@ export const BibleReader: React.FC<BibleReaderProps> = React.memo(({
               <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-200" />
               <span>Comparar Versiones (RVR / NTV / NBLA)</span>
             </button>
+
+            {onProjectVerse && (
+              <button
+                type="button"
+                onClick={handleProjectSelection}
+                className="col-span-2 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-colors cursor-pointer text-[11px] shadow-xs"
+                title="Enviar esta selección a la ventana del proyector"
+              >
+                <MonitorPlay className="w-3.5 h-3.5" />
+                <span>Proyectar versículo en 2ª pantalla</span>
+              </button>
+            )}
           </div>
         </div>
       )}
